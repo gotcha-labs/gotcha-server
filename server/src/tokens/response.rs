@@ -2,7 +2,7 @@ use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use std::{net::IpAddr, time::Duration};
 
-use crate::{encodings::Base64, hostname::Hostname};
+use crate::{domain::hostname::Hostname, encodings::Base64};
 
 use super::TimeClaims;
 

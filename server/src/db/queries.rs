@@ -8,8 +8,8 @@ use uuid::Uuid;
 
 use crate::{
     db::MapNested,
+    domain::hostname::Hostname,
     encodings::{Base64, UrlSafe},
-    hostname::Hostname,
 };
 
 use super::Error;

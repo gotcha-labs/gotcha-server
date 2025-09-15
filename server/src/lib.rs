@@ -20,14 +20,14 @@ use aws_lambda::*;
 pub mod analysis;
 pub mod configuration;
 pub mod db;
+mod domain;
 pub mod encodings;
-pub mod hostname;
 pub mod routes;
-mod serde;
 pub mod test_helpers;
 pub mod tokens;
 
 pub use configuration::{Config, get_configuration};
+pub use domain::serde;
 
 fn build_client() -> Client {
     const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);

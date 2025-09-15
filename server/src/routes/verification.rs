@@ -10,7 +10,7 @@ use thiserror::Error;
 use time::OffsetDateTime;
 use tracing::{Level, instrument};
 
-use crate::{AppState, db, encodings::Base64, hostname::Hostname, tokens::response};
+use crate::{AppState, db, domain::hostname::Hostname, encodings::Base64, tokens::response};
 
 use super::errors::VerificationError;
 

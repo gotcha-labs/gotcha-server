@@ -16,9 +16,8 @@ use crate::{
         self, DbApiKey, DbChallengeCustomization, DbConsole, DbUpdateApiKey,
         DbUpdateChallengeCustomization, DbUpdateConsole, RowsAffected,
     },
+    domain::{hostname::Hostname, serde::nested_option},
     encodings::{Base64, KEY_SIZE, Standard, UrlSafe},
-    hostname::Hostname,
-    serde::nested_option,
 };
 
 /// Response payload of retrieving a console.

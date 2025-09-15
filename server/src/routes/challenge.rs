@@ -21,8 +21,8 @@ use crate::{
         proof_of_work::PowChallenge,
     },
     db::{self, DbChallenge},
+    domain::hostname::Hostname,
     encodings::{Base64, UrlSafe},
-    hostname::Hostname,
     tokens::{
         self, pow_challenge,
         response::{self, ResponseClaims},
