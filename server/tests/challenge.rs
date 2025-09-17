@@ -2,10 +2,10 @@ use gotcha_server::{
     HTTP_CLIENT,
     routes::challenge::{
         AccessibilityRequest, ChallengeResponse, ChallengeResults, GetChallenge, PowResponse,
-        PreAnalysisRequest, ProofOfWork,
+        PreAnalysisRequest, PreAnalysisResponse, ProofOfWork,
     },
     tokens::{
-        TimeClaims,
+        TimeClaims, pow_challenge,
         response::{JWT_RESPONSE_ALGORITHM, ResponseClaims},
     },
 };
@@ -129,6 +129,67 @@ async fn process_challenge_with_invalid_secret(server: TestContext) -> anyhow::R
 }
 
 #[integration_test]
+async fn process_challenge_wrong_hostname(server: TestContext) -> anyhow::Result<()> {
+    let port = server.port();
+    let site_key = server.db_api_site_key().await;
+
+    let response = HTTP_CLIENT
+        .post(format!("http://localhost:{port}/api/challenge/process"))
+        .json(&ChallengeResults {
+            success: true,
+            site_key,
+            hostname: "wrong-website-integration.test.com".parse()?,
+            challenge: Url::parse("https://gotcha-integration.test.com/im-not-a-robot/index.html")?,
+            interactions: vec![],
+        })
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+    Ok(())
+}
+
+#[integration_test]
+async fn process_pre_analysis_succeeds_but_with_failure(server: TestContext) -> anyhow::Result<()> {
+    let port = server.port();
+    let site_key = server.db_api_site_key().await;
+    let enc_key = server.db_enconding_key().await;
+
+    let pow_res: PowResponse = HTTP_CLIENT
+        .get(format!(
+            "http://localhost:{port}/api/challenge/proof-of-work?site_key={site_key}"
+        ))
+        .send()
+        .await?
+        .json()
+        .await?;
+    let pow_challenge = pow_challenge::decode(&pow_res.token, enc_key.as_str())
+        .expect("server returned invalid PoW");
+
+    let response = HTTP_CLIENT
+        .post(format!(
+            "http://localhost:{port}/api/challenge/process-pre-analysis"
+        ))
+        .json(&PreAnalysisRequest {
+            site_key,
+            hostname: "website-integration.test.com".parse()?,
+            interactions: vec![],
+            proof_of_work: ProofOfWork {
+                challenge: pow_res.token,
+                solution: pow_challenge.solve(),
+            },
+        })
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let response: PreAnalysisResponse = response.json().await?;
+    assert_eq!(response, PreAnalysisResponse::Failure);
+
+    Ok(())
+}
+
+#[integration_test]
 async fn process_pre_analysis_fails_on_invalid_proof_of_work(
     server: TestContext,
 ) -> anyhow::Result<()> {
@@ -186,6 +247,82 @@ async fn process_pre_analysis_fails_on_proof_of_work_failed(
 }
 
 #[integration_test]
+async fn process_pre_analysis_with_wrong_hostname(server: TestContext) -> anyhow::Result<()> {
+    let port = server.port();
+    let site_key = server.db_api_site_key().await;
+    let enc_key = server.db_enconding_key().await;
+
+    let pow_res: PowResponse = HTTP_CLIENT
+        .get(format!(
+            "http://localhost:{port}/api/challenge/proof-of-work?site_key={site_key}"
+        ))
+        .send()
+        .await?
+        .json()
+        .await?;
+    let pow_challenge = pow_challenge::decode(&pow_res.token, enc_key.as_str())
+        .expect("server returned invalid PoW");
+
+    let response = HTTP_CLIENT
+        .post(format!(
+            "http://localhost:{port}/api/challenge/process-pre-analysis"
+        ))
+        .json(&PreAnalysisRequest {
+            site_key,
+            hostname: "wrong-website-integration.test.com".parse()?,
+            interactions: vec![],
+            proof_of_work: ProofOfWork {
+                challenge: pow_res.token,
+                solution: pow_challenge.solve(),
+            },
+        })
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+    Ok(())
+}
+
+#[integration_test]
+async fn process_accessibility_success(server: TestContext) -> anyhow::Result<()> {
+    let port = server.port();
+    let site_key = server.db_api_site_key().await;
+    let enc_key = server.db_enconding_key().await;
+
+    let pow_res: PowResponse = HTTP_CLIENT
+        .get(format!(
+            "http://localhost:{port}/api/challenge/proof-of-work?site_key={site_key}"
+        ))
+        .send()
+        .await?
+        .json()
+        .await?;
+    let pow_challenge = pow_challenge::decode(&pow_res.token, enc_key.as_str())
+        .expect("server returned invalid PoW");
+
+    let response = HTTP_CLIENT
+        .post(format!(
+            "http://localhost:{port}/api/challenge/process-accessibility"
+        ))
+        .json(&AccessibilityRequest {
+            site_key,
+            hostname: "website-integration.test.com".parse()?,
+            proof_of_work: ProofOfWork {
+                challenge: pow_res.token,
+                solution: pow_challenge.solve(),
+            },
+        })
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let response: PreAnalysisResponse = response.json().await?;
+    assert!(matches!(response, PreAnalysisResponse::Success { .. }));
+
+    Ok(())
+}
+
+#[integration_test]
 async fn process_accessibility_fails_on_invalid_proof_of_work(
     server: TestContext,
 ) -> anyhow::Result<()> {
@@ -236,6 +373,42 @@ async fn process_accessibility_fails_on_proof_of_work_failed(
         .send()
         .await?;
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    Ok(())
+}
+
+#[integration_test]
+async fn process_accessibility_with_wrong_hostname(server: TestContext) -> anyhow::Result<()> {
+    let port = server.port();
+    let site_key = server.db_api_site_key().await;
+    let enc_key = server.db_enconding_key().await;
+
+    let pow_res: PowResponse = HTTP_CLIENT
+        .get(format!(
+            "http://localhost:{port}/api/challenge/proof-of-work?site_key={site_key}"
+        ))
+        .send()
+        .await?
+        .json()
+        .await?;
+    let pow_challenge = pow_challenge::decode(&pow_res.token, enc_key.as_str())
+        .expect("server returned invalid PoW");
+
+    let response = HTTP_CLIENT
+        .post(format!(
+            "http://localhost:{port}/api/challenge/process-accessibility"
+        ))
+        .json(&AccessibilityRequest {
+            site_key,
+            hostname: "wrong-website-integration.test.com".parse()?,
+            proof_of_work: ProofOfWork {
+                challenge: pow_res.token,
+                solution: pow_challenge.solve(),
+            },
+        })
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 
     Ok(())
 }

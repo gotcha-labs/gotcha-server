@@ -8,7 +8,8 @@ use uuid::Uuid;
 
 use crate::{
     HTTP_CLIENT, app, configuration,
-    db::{self, DbChallenge},
+    db::{self, DbChallenge, DbUpdateApiKey},
+    domain::hostname::Hostname,
     encodings::{Base64, KEY_SIZE, Standard, UrlSafe},
     get_configuration,
 };
@@ -143,13 +144,25 @@ async fn populate_demo(pool: &PgPool, test_id: &Uuid) -> db::Result<()> {
         DEMO_USER,
     )
     .await?;
+    let site_key = Base64::<UrlSafe>::random::<KEY_SIZE>();
     db::insert_api_key(
         &mut *txn,
-        &Base64::<UrlSafe>::random::<KEY_SIZE>(),
+        &site_key,
         &console_id,
         &Base64::<Standard>::random::<KEY_SIZE>(),
         &Base64::<Standard>::random::<KEY_SIZE>(),
         &[],
+    )
+    .await?;
+
+    db::update_api_key(
+        &mut *txn,
+        &site_key,
+        &console_id,
+        DbUpdateApiKey {
+            label: None,
+            allowed_domains: Some(&[Hostname::parse("website-integration.test.com").unwrap()]),
+        },
     )
     .await?;
 

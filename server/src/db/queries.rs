@@ -155,6 +155,22 @@ pub async fn exists_api_key_for_console(
     .map(Ok)?
 }
 
+pub async fn exists_allowed_domain_in_api_key(
+    exec: impl PgExecutor<'_> + Send,
+    site_key: &Base64<UrlSafe>,
+    domain: &Hostname,
+) -> Result<Option<bool>> {
+    sqlx::query_scalar!(
+        "select $2 = ANY(allowed_domains) as found_domain_for_site_key from api_key where site_key = $1",
+        site_key.as_str(),
+        domain.as_str(),
+    )
+    .fetch_optional(exec)
+    .await
+    .map_err(Error::from)
+    .map(|opt| opt.map(|result| result.unwrap_or(false)))
+}
+
 pub(crate) async fn with_console_insert_api_key(
     exec: impl PgExecutor<'_> + Send + Clone,
     console_label: &str,

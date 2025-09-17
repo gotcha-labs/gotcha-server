@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select $2 = ANY(allowed_domains) as found_domain_for_site_key from api_key where site_key = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "found_domain_for_site_key",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "c81e1b6486fe0983408d31862f374a01a2271d0d58c4264f8ac6b1bdb9f3f6bb"
+}

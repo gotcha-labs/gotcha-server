@@ -119,7 +119,7 @@ pub struct ChallengeResults {
 }
 
 /// Response payload of processing the challenge route.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct ChallengeResponse {
     /// JWT as proof of the challenge solution.
     pub token: String,
@@ -141,6 +141,15 @@ pub async fn process_challenge(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(results): Json<ChallengeResults>,
 ) -> Result<Json<ChallengeResponse>, ChallengeError> {
+    let is_allowed_domain =
+        db::exists_allowed_domain_in_api_key(&state.pool, &results.site_key, &results.hostname)
+            .await?
+            .ok_or(ChallengeError::InvalidKey)?;
+
+    if !is_allowed_domain {
+        return Err(ChallengeError::DomainNotAllowed);
+    }
+
     // TODO: potentially heavy CPU operation - offload to a task
     let Score(score) = analysis::interaction::interaction_analysis(&results.interactions);
     Span::current().record("interaction_score", score);
@@ -200,7 +209,7 @@ impl ProofOfWork {
 }
 
 /// Response payload of pre analysis route.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "result")]
 #[serde(rename_all = "kebab-case")]
 pub enum PreAnalysisResponse {
@@ -232,6 +241,15 @@ pub async fn process_pre_analysis(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(request): Json<PreAnalysisRequest>,
 ) -> Result<Json<PreAnalysisResponse>, ChallengeError> {
+    let is_allowed_domain =
+        db::exists_allowed_domain_in_api_key(&state.pool, &request.site_key, &request.hostname)
+            .await?
+            .ok_or(ChallengeError::InvalidKey)?;
+
+    if !is_allowed_domain {
+        return Err(ChallengeError::DomainNotAllowed);
+    }
+
     // TODO: look at cookies and other fingerprints
     let crypt_key = db::fetch_api_key_by_site_key(&state.pool, &request.site_key)
         .await
@@ -302,6 +320,15 @@ pub async fn process_accessibility_challenge(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(request): Json<AccessibilityRequest>,
 ) -> Result<Json<PreAnalysisResponse>, ChallengeError> {
+    let is_allowed_domain =
+        db::exists_allowed_domain_in_api_key(&state.pool, &request.site_key, &request.hostname)
+            .await?
+            .ok_or(ChallengeError::InvalidKey)?;
+
+    if !is_allowed_domain {
+        return Err(ChallengeError::DomainNotAllowed);
+    }
+
     // TODO: look at cookies and other fingerprints
     let crypt_key = db::fetch_api_key_by_site_key(&state.pool, &request.site_key)
         .await

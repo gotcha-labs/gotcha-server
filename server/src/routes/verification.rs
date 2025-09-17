@@ -54,20 +54,28 @@ pub async fn site_verify(
     let verification: Result<VerificationRequest, Vec<ErrorCodes>> = verification.try_into();
     let verification = verification.map_err(VerificationResponse::failure)?;
 
-    let enc_key = db::fetch_api_key_by_secret(&state.pool, verification.secret.expose_secret())
+    let api_key = db::fetch_api_key_by_secret(&state.pool, verification.secret.expose_secret())
         .await
         .context("failed to fetch encoding key bey api secret while verifying challenge")?
         .ok_or(VerificationResponse::failure(vec![
             ErrorCodes::InvalidInputSecret,
-        ]))?
-        .encoding_key;
+        ]))?;
 
-    let claims = response::decode(&verification.response, &enc_key)
+    let claims = response::decode(&verification.response, &api_key.encoding_key)
         .map_err(|err| match err.into_kind() {
             ErrorKind::ExpiredSignature => ErrorCodes::TimeoutOrDuplicate,
             _ => ErrorCodes::InvalidInputResponse,
         })
         .map_err(|err_code| VerificationResponse::failure(vec![err_code]))?;
+
+    let is_allowed_domain = api_key
+        .allowed_domains
+        .iter()
+        .any(|domain| domain == &claims.other.host);
+
+    if !is_allowed_domain {
+        return Err(VerificationResponse::failure(vec![ErrorCodes::TimeoutOrDuplicate]).into());
+    }
 
     let solver_check = verification
         .remoteip

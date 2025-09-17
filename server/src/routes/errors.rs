@@ -21,6 +21,8 @@ pub enum ChallengeError {
     FailedProofOfWork,
     #[error("No matching challenge")]
     NoMatchingChallenge,
+    #[error("Domain not allowed, add this domain to the list of allowed domains")]
+    DomainNotAllowed,
     #[error(transparent)]
     Unexpected(#[from] anyhow::Error),
 }
@@ -42,6 +44,9 @@ impl IntoResponse for ChallengeError {
             }
             ChallengeError::NoMatchingChallenge => {
                 (StatusCode::NOT_FOUND, self.to_string()).into_response()
+            }
+            ChallengeError::DomainNotAllowed => {
+                (StatusCode::FORBIDDEN, self.to_string()).into_response()
             }
         }
     }
