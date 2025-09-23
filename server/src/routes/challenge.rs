@@ -5,7 +5,7 @@ use std::{net::SocketAddr, sync::Arc};
 use anyhow::Context;
 use axum::{
     Json,
-    extract::{ConnectInfo, Query, State},
+    extract::{ConnectInfo, State},
 };
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -22,18 +22,13 @@ use crate::{
     },
     db::{self, DbChallenge},
     domain::hostname::Hostname,
-    encodings::{Base64, UrlSafe},
+    encodings::Base64,
+    routes::extractors::SiteKey,
     tokens::{
         self, pow_challenge,
         response::{self, ResponseClaims},
     },
 };
-
-/// Expected params for get challenge route.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ChallengeParams {
-    pub site_key: Option<Base64<UrlSafe>>,
-}
 
 /// Response payload of get challenge route.
 #[derive(Debug, Serialize, Deserialize)]
@@ -56,24 +51,19 @@ pub struct GetChallenge {
 /// If `site_key` param is absent it responds with the defaults.
 #[instrument(skip(state), ret(Debug, level = Level::DEBUG), err(Debug, level = Level::ERROR))]
 pub async fn get_challenge(
-    Query(query): Query<ChallengeParams>,
+    site_key: Option<SiteKey>,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<GetChallenge>, ChallengeError> {
-    let challenges = match query.site_key {
-        Some(site_key) => db::fetch_challenges_with_customization(&state.pool, &site_key).await,
+    let challenges = match site_key {
+        Some(SiteKey(site_key)) => {
+            db::fetch_challenges_with_customization(&state.pool, &site_key).await
+        }
         None => db::fetch_challenges(&state.pool).await,
     }
     .context("failed to fetch challenges")?;
     let challenge = choose_challenge(challenges).ok_or(ChallengeError::NoMatchingChallenge)?;
 
     Ok(Json(challenge.try_into()?))
-}
-
-/// Expected params for get proof of work route.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PowParams {
-    /// Public site key encoded in base64 url safe alphabet.
-    pub site_key: Base64<UrlSafe>,
 }
 
 /// Response payload of get proof of work route.
@@ -87,10 +77,10 @@ pub struct PowResponse {
 /// Difficulty hardcoded to 3. Future work may include customizing it in an admin page.
 #[instrument(skip(state), ret(Debug, level = Level::DEBUG), err(Debug, level = Level::ERROR))]
 pub async fn get_proof_of_work_challenge(
-    Query(query): Query<PowParams>,
+    SiteKey(site_key): SiteKey,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<PowResponse>, ChallengeError> {
-    let enc_key = db::fetch_api_key_by_site_key(&state.pool, &query.site_key)
+    let enc_key = db::fetch_api_key_by_site_key(&state.pool, &site_key)
         .await
         .context("failed to fetch api key by site key while getting proof of work")?
         .ok_or(ChallengeError::InvalidKey)?
@@ -107,8 +97,6 @@ pub async fn get_proof_of_work_challenge(
 pub struct ChallengeResults {
     /// Wether or not successful.
     pub success: bool,
-    /// Public site key encoded in base64 url safe alphabet.
-    pub site_key: Base64<UrlSafe>,
     /// The host name of the URL where it was solved.
     pub hostname: Hostname,
     /// The challenge URL that it was solved.
@@ -130,7 +118,7 @@ pub struct ChallengeResponse {
     fields(
         ?addr,
         success = results.success,
-        %site_key = results.site_key,
+        site_key,
         ?hostname = results.hostname,
         %challenge = results.challenge,
         interaction_score,
@@ -139,17 +127,9 @@ pub struct ChallengeResponse {
 pub async fn process_challenge(
     State(state): State<Arc<AppState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    SiteKey(site_key): SiteKey,
     Json(results): Json<ChallengeResults>,
 ) -> Result<Json<ChallengeResponse>, ChallengeError> {
-    let is_allowed_domain =
-        db::exists_allowed_domain_in_api_key(&state.pool, &results.site_key, &results.hostname)
-            .await?
-            .ok_or(ChallengeError::InvalidKey)?;
-
-    if !is_allowed_domain {
-        return Err(ChallengeError::DomainNotAllowed);
-    }
-
     // TODO: potentially heavy CPU operation - offload to a task
     let Score(score) = analysis::interaction::interaction_analysis(&results.interactions);
     Span::current().record("interaction_score", score);
@@ -164,7 +144,7 @@ pub async fn process_challenge(
     Ok(Json(ChallengeResponse {
         token: response::encode(
             ResponseClaims { score, addr: addr.ip(), host: results.hostname },
-            &db::fetch_api_key_by_site_key(&state.pool, &results.site_key)
+            &db::fetch_api_key_by_site_key(&state.pool, &site_key)
                 .await
                 .context("failed to fetch api key by site key while processing challenge")?
                 .ok_or(ChallengeError::InvalidKey)?
@@ -177,8 +157,6 @@ pub async fn process_challenge(
 /// Expected payload for pre analysis route.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PreAnalysisRequest {
-    /// Public site key encoded in base64 url safe alphabet.
-    pub site_key: Base64<UrlSafe>,
     /// The host name of the URL where it was solved.
     pub hostname: Hostname,
     /// The list of interactions performed while solving the challenge.
@@ -228,7 +206,7 @@ pub enum PreAnalysisResponse {
 /// TODO: check fingerprint.
 #[instrument(skip(state, request), ret(Debug, level = Level::DEBUG), err(Debug, level = Level::ERROR),
     fields(
-        %site_key = request.site_key,
+        site_key,
         ?hostname = request.hostname,
         pow_jwt,
         pow_decoded,
@@ -239,19 +217,11 @@ pub enum PreAnalysisResponse {
 pub async fn process_pre_analysis(
     State(state): State<Arc<AppState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    SiteKey(site_key): SiteKey,
     Json(request): Json<PreAnalysisRequest>,
 ) -> Result<Json<PreAnalysisResponse>, ChallengeError> {
-    let is_allowed_domain =
-        db::exists_allowed_domain_in_api_key(&state.pool, &request.site_key, &request.hostname)
-            .await?
-            .ok_or(ChallengeError::InvalidKey)?;
-
-    if !is_allowed_domain {
-        return Err(ChallengeError::DomainNotAllowed);
-    }
-
     // TODO: look at cookies and other fingerprints
-    let crypt_key = db::fetch_api_key_by_site_key(&state.pool, &request.site_key)
+    let crypt_key = db::fetch_api_key_by_site_key(&state.pool, &site_key)
         .await
         .context("failed to fetch api key by api secret while processing pre analysis")?
         .ok_or(ChallengeError::InvalidKey)?
@@ -295,8 +265,6 @@ pub async fn process_pre_analysis(
 /// Expected payload for acessibility route.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AccessibilityRequest {
-    /// Public site key encoded in base64 url safe alphabet.
-    pub site_key: Base64<UrlSafe>,
     /// The host name of the URL where it was solved.
     pub hostname: Hostname,
     /// Proof of work computed by the client.
@@ -308,7 +276,7 @@ pub struct AccessibilityRequest {
 #[instrument(skip(state, request), ret(Debug, level = Level::DEBUG), err(Debug, level = Level::ERROR),
     fields(
         ?addr,
-        ?site_key = request.site_key,
+        site_key,
         ?hostname = request.hostname,
         pow_jwt,
         pow_decoded,
@@ -318,19 +286,11 @@ pub struct AccessibilityRequest {
 pub async fn process_accessibility_challenge(
     State(state): State<Arc<AppState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    SiteKey(site_key): SiteKey,
     Json(request): Json<AccessibilityRequest>,
 ) -> Result<Json<PreAnalysisResponse>, ChallengeError> {
-    let is_allowed_domain =
-        db::exists_allowed_domain_in_api_key(&state.pool, &request.site_key, &request.hostname)
-            .await?
-            .ok_or(ChallengeError::InvalidKey)?;
-
-    if !is_allowed_domain {
-        return Err(ChallengeError::DomainNotAllowed);
-    }
-
     // TODO: look at cookies and other fingerprints
-    let crypt_key = db::fetch_api_key_by_site_key(&state.pool, &request.site_key)
+    let crypt_key = db::fetch_api_key_by_site_key(&state.pool, &site_key)
         .await
         .context("failed to fetch api key by api secret while processing accessility challenge")?
         .ok_or(ChallengeError::InvalidKey)?

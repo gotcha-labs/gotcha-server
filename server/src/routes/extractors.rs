@@ -3,8 +3,14 @@ use std::sync::Arc;
 #[cfg(feature = "aws-lambda")]
 use axum::http::Request;
 use axum::{
-    extract::FromRequestParts,
+    extract::{FromRequestParts, OptionalFromRequestParts},
     http::{StatusCode, request::Parts},
+};
+use axum_extra::{TypedHeader, typed_header::TypedHeaderRejection};
+
+use crate::{
+    encodings::{Base64, UrlSafe},
+    routes::custom_headers::XSiteKey,
 };
 
 #[cfg(feature = "aws-lambda")]
@@ -99,5 +105,40 @@ where
             .get::<User>()
             .cloned()
             .ok_or(StatusCode::UNAUTHORIZED)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SiteKey(pub Base64<UrlSafe>);
+
+impl<S> FromRequestParts<S> for SiteKey
+where
+    S: Send + Sync,
+{
+    type Rejection = TypedHeaderRejection;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let TypedHeader(XSiteKey(site_key)) =
+            <TypedHeader<XSiteKey> as FromRequestParts<S>>::from_request_parts(parts, state)
+                .await?;
+        Ok(SiteKey(site_key))
+    }
+}
+
+impl<S> OptionalFromRequestParts<S> for SiteKey
+where
+    S: Send + Sync,
+{
+    type Rejection = TypedHeaderRejection;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &S,
+    ) -> Result<Option<Self>, Self::Rejection> {
+        let site_key = <TypedHeader<XSiteKey> as OptionalFromRequestParts<S>>::from_request_parts(
+            parts, state,
+        )
+        .await?;
+        Ok(site_key.map(|TypedHeader(XSiteKey(site_key))| SiteKey(site_key)))
     }
 }

@@ -20,12 +20,16 @@ use verification::site_verify;
 
 use crate::{
     AppState,
-    routes::console::{get_challenge_preferences, update_challenge_preferences},
+    routes::{
+        console::{get_challenge_preferences, update_challenge_preferences},
+        middleware::validate_hostname,
+    },
 };
 
 pub mod admin;
 pub mod challenge;
 pub mod console;
+pub mod custom_headers;
 mod errors;
 pub mod extractors;
 pub mod middleware;
@@ -36,11 +40,18 @@ pub fn challenge(state: &Arc<AppState>) -> Router {
     Router::new()
         .route("/", get(get_challenge))
         .route("/proof-of-work", get(get_proof_of_work_challenge))
-        .route("/process", post(process_challenge))
-        .route("/process-pre-analysis", post(process_pre_analysis))
-        .route(
-            "/process-accessibility",
-            post(process_accessibility_challenge),
+        .merge(
+            Router::new()
+                .route("/process", post(process_challenge))
+                .route("/process-pre-analysis", post(process_pre_analysis))
+                .route(
+                    "/process-accessibility",
+                    post(process_accessibility_challenge),
+                )
+                .layer(axum::middleware::from_fn_with_state(
+                    Arc::clone(&state),
+                    validate_hostname,
+                )),
         )
         .layer(axum::middleware::from_fn(block_bot_agent))
         .with_state(state)

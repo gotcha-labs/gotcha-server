@@ -58,9 +58,11 @@ export async function fetchChallenge(
 ): Promise<FetchChallenge | null> {
   try {
     const origin = import.meta.env.VITE_GOTCHA_SV_ORIGIN;
-    const url = new URL(`${origin}/api/challenge?site_key=${siteKey}`);
+    const url = new URL(`${origin}/api/challenge`);
 
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: { "X-Site-Key": siteKey },
+    });
     return await response.json();
   } catch (e) {
     console.error("failed to fetch", e);
@@ -85,6 +87,7 @@ export async function processChallenge(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "X-Site-Key": siteKey,
       },
       body: JSON.stringify({
         success,
@@ -114,7 +117,7 @@ export type PreAnalysisResponse =
   | { result: "success"; response: { token: string } };
 
 export async function processPreAnalysis(
-  site_key: string,
+  siteKey: string,
   proofOfWork: PowResult,
   interactions: Interaction[],
 ): Promise<PreAnalysisResponse | null> {
@@ -125,9 +128,10 @@ export async function processPreAnalysis(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "X-Site-Key": siteKey,
       },
       body: JSON.stringify({
-        site_key,
+        siteKey,
         hostname: window.location.hostname,
         interactions,
         proof_of_work: proofOfWork,
@@ -146,7 +150,7 @@ export async function processPreAnalysis(
 }
 
 export async function processAccessibility(
-  site_key: string,
+  siteKey: string,
   proofOfWork: { challenge: string; solution: number },
 ): Promise<PreAnalysisResponse | null> {
   try {
@@ -156,9 +160,10 @@ export async function processAccessibility(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "X-Site-Key": siteKey,
       },
       body: JSON.stringify({
-        site_key,
+        siteKey,
         hostname: window.location.hostname,
         proof_of_work: proofOfWork,
       }),
@@ -184,9 +189,9 @@ export async function getProofOfWorkChallenge(
 ): Promise<ProofOfWorkChallenge | null> {
   try {
     const origin = import.meta.env.VITE_GOTCHA_SV_ORIGIN;
-    const response = await fetch(
-      `${origin}/api/challenge/proof-of-work?site_key=${siteKey}`,
-    );
+    const response = await fetch(`${origin}/api/challenge/proof-of-work`, {
+      headers: { "X-Site-Key": siteKey },
+    });
     if (response.status !== 200)
       throw new Error(
         `getProofOfWorkChallenge returned status code ${response.status}`,

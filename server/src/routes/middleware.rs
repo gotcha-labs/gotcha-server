@@ -9,8 +9,9 @@ use axum::{
 };
 use axum_extra::{
     TypedHeader,
-    headers::{Authorization, UserAgent, authorization::Bearer},
+    headers::{Authorization, Origin, UserAgent, authorization::Bearer},
 };
+
 use isbot::Bots;
 use jsonwebtoken::{DecodingKey, jwk::JwkSet};
 use serde::Deserialize;
@@ -21,7 +22,10 @@ use uuid::Uuid;
 use crate::{
     AppState, HTTP_CACHE_CLIENT, db,
     encodings::{Base64, UrlSafe},
-    routes::extractors::User,
+    routes::{
+        errors::ChallengeError,
+        extractors::{SiteKey, User},
+    },
     tokens,
 };
 
@@ -176,4 +180,27 @@ pub async fn block_bot_agent(
             StatusCode::FORBIDDEN.into_response()
         }
     }
+}
+
+#[instrument(skip_all, fields(origin))]
+pub async fn validate_hostname(
+    State(state): State<Arc<AppState>>,
+    SiteKey(site_key): SiteKey,
+    TypedHeader(origin): TypedHeader<Origin>,
+    request: Request,
+    next: Next,
+) -> Result<Response, ChallengeError> {
+    let hostname = origin
+        .hostname()
+        .parse()
+        .map_err(|_| ChallengeError::InvalidOrigin)?;
+
+    let is_allowed_domain = db::exists_allowed_domain_in_api_key(&state.pool, &site_key, &hostname)
+        .await?
+        .ok_or(ChallengeError::InvalidKey)?;
+
+    if !is_allowed_domain {
+        return Err(ChallengeError::DomainNotAllowed);
+    }
+    Ok(next.run(request).await)
 }
