@@ -97,8 +97,6 @@ pub async fn get_proof_of_work_challenge(
 pub struct ChallengeResults {
     /// Wether or not successful.
     pub success: bool,
-    /// The host name of the URL where it was solved.
-    pub hostname: Hostname,
     /// The challenge URL that it was solved.
     pub challenge: Url,
     /// The list of interactions performed while solving the challenge.
@@ -118,8 +116,6 @@ pub struct ChallengeResponse {
     fields(
         ?addr,
         success = results.success,
-        site_key,
-        ?hostname = results.hostname,
         %challenge = results.challenge,
         interaction_score,
     )
@@ -128,6 +124,7 @@ pub async fn process_challenge(
     State(state): State<Arc<AppState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     SiteKey(site_key): SiteKey,
+    hostname: Hostname,
     Json(results): Json<ChallengeResults>,
 ) -> Result<Json<ChallengeResponse>, ChallengeError> {
     // TODO: potentially heavy CPU operation - offload to a task
@@ -143,7 +140,7 @@ pub async fn process_challenge(
 
     Ok(Json(ChallengeResponse {
         token: response::encode(
-            ResponseClaims { score, addr: addr.ip(), host: results.hostname },
+            ResponseClaims { score, addr: addr.ip(), host: hostname },
             &db::fetch_api_key_by_site_key(&state.pool, &site_key)
                 .await
                 .context("failed to fetch api key by site key while processing challenge")?
@@ -157,8 +154,6 @@ pub async fn process_challenge(
 /// Expected payload for pre analysis route.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PreAnalysisRequest {
-    /// The host name of the URL where it was solved.
-    pub hostname: Hostname,
     /// The list of interactions performed while solving the challenge.
     pub interactions: Vec<Interaction>,
     /// Proof of work computed by the client.
@@ -206,8 +201,6 @@ pub enum PreAnalysisResponse {
 /// TODO: check fingerprint.
 #[instrument(skip(state, request), ret(Debug, level = Level::DEBUG), err(Debug, level = Level::ERROR),
     fields(
-        site_key,
-        ?hostname = request.hostname,
         pow_jwt,
         pow_decoded,
         pow_solution = request.proof_of_work.solution,
@@ -218,6 +211,7 @@ pub async fn process_pre_analysis(
     State(state): State<Arc<AppState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     SiteKey(site_key): SiteKey,
+    hostname: Hostname,
     Json(request): Json<PreAnalysisRequest>,
 ) -> Result<Json<PreAnalysisResponse>, ChallengeError> {
     // TODO: look at cookies and other fingerprints
@@ -245,7 +239,7 @@ pub async fn process_pre_analysis(
         0.5..=1. => PreAnalysisResponse::Success {
             response: ChallengeResponse {
                 token: response::encode(
-                    ResponseClaims { score, addr: addr.ip(), host: request.hostname },
+                    ResponseClaims { score, addr: addr.ip(), host: hostname },
                     &crypt_key,
                 )
                 .context("failed encoding jwt response")?,
@@ -265,8 +259,6 @@ pub async fn process_pre_analysis(
 /// Expected payload for acessibility route.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AccessibilityRequest {
-    /// The host name of the URL where it was solved.
-    pub hostname: Hostname,
     /// Proof of work computed by the client.
     pub proof_of_work: ProofOfWork,
 }
@@ -276,8 +268,6 @@ pub struct AccessibilityRequest {
 #[instrument(skip(state, request), ret(Debug, level = Level::DEBUG), err(Debug, level = Level::ERROR),
     fields(
         ?addr,
-        site_key,
-        ?hostname = request.hostname,
         pow_jwt,
         pow_decoded,
         solution = request.proof_of_work.solution,
@@ -287,6 +277,7 @@ pub async fn process_accessibility_challenge(
     State(state): State<Arc<AppState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     SiteKey(site_key): SiteKey,
+    hostname: Hostname,
     Json(request): Json<AccessibilityRequest>,
 ) -> Result<Json<PreAnalysisResponse>, ChallengeError> {
     // TODO: look at cookies and other fingerprints
@@ -302,7 +293,7 @@ pub async fn process_accessibility_challenge(
     }
 
     let token = response::encode(
-        ResponseClaims { score: 1.0, addr: addr.ip(), host: request.hostname },
+        ResponseClaims { score: 1.0, addr: addr.ip(), host: hostname },
         &crypt_key,
     )?;
 

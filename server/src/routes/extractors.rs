@@ -9,6 +9,7 @@ use axum::{
 use axum_extra::{TypedHeader, typed_header::TypedHeaderRejection};
 
 use crate::{
+    domain::hostname::Hostname,
     encodings::{Base64, UrlSafe},
     routes::custom_headers::XSiteKey,
 };
@@ -140,5 +141,20 @@ where
         )
         .await?;
         Ok(site_key.map(|TypedHeader(XSiteKey(site_key))| SiteKey(site_key)))
+    }
+}
+
+impl<S> FromRequestParts<S> for Hostname
+where
+    S: Send + Sync,
+{
+    type Rejection = StatusCode;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        parts
+            .extensions
+            .get::<Hostname>()
+            .cloned()
+            .ok_or(StatusCode::BAD_REQUEST)
     }
 }

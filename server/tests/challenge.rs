@@ -69,8 +69,6 @@ async fn process_successful_challenge(server: TestContext) -> anyhow::Result<()>
         .header("X-Site-Key", site_key.as_str())
         .json(&ChallengeResults {
             success: true,
-            // site_key,
-            hostname: "website-integration.test.com".parse()?,
             challenge: Url::parse("https://gotcha-integration.test.com/im-not-a-robot/index.html")?,
             interactions: vec![],
         })
@@ -103,8 +101,6 @@ async fn process_failed_challenge(server: TestContext) -> anyhow::Result<()> {
         .header("X-Site-Key", site_key.as_str())
         .json(&ChallengeResults {
             success: false,
-            // site_key,
-            hostname: "website-integration.test.com".parse()?,
             challenge: Url::parse("https://gotcha-integration.test.com/im-not-a-robot/index.html")?,
             interactions: vec![],
         })
@@ -158,8 +154,7 @@ async fn process_challenge_wrong_hostname(server: TestContext) -> anyhow::Result
         .header("X-Site-Key", site_key.as_str())
         .json(&ChallengeResults {
             success: true,
-            // site_key,
-            hostname: "wrong-website-integration.test.com".parse()?,
+
             challenge: Url::parse("https://gotcha-integration.test.com/im-not-a-robot/index.html")?,
             interactions: vec![],
         })
@@ -187,8 +182,6 @@ async fn process_pre_analysis_succeeds_but_with_failure(server: TestContext) -> 
         .header("Origin", "http://website-integration.test.com")
         .header("X-Site-Key", site_key.as_str())
         .json(&PreAnalysisRequest {
-            // site_key,
-            hostname: "website-integration.test.com".parse()?,
             interactions: vec![],
             proof_of_work: ProofOfWork {
                 challenge: pow_res.token,
@@ -219,8 +212,6 @@ async fn process_pre_analysis_fails_on_invalid_proof_of_work(
         .header("Origin", "http://website-integration.test.com")
         .header("X-Site-Key", site_key.as_str())
         .json(&PreAnalysisRequest {
-            // site_key,
-            hostname: "website-integration.test.com".parse()?,
             interactions: vec![],
             proof_of_work: ProofOfWork { challenge: "".into(), solution: 0 },
         })
@@ -247,8 +238,6 @@ async fn process_pre_analysis_fails_on_proof_of_work_failed(
         .header("Origin", "http://website-integration.test.com")
         .header("X-Site-Key", site_key.as_str())
         .json(&PreAnalysisRequest {
-            // site_key,
-            hostname: "website-integration.test.com".parse()?,
             interactions: vec![],
             proof_of_work: ProofOfWork { challenge: pow.token, solution: 0 },
         })
@@ -276,8 +265,6 @@ async fn process_pre_analysis_with_wrong_hostname(server: TestContext) -> anyhow
         .header("Origin", "http://wrong-website-integration.test.com")
         .header("X-Site-Key", site_key.as_str())
         .json(&PreAnalysisRequest {
-            // site_key,
-            hostname: "wrong-website-integration.test.com".parse()?,
             interactions: vec![],
             proof_of_work: ProofOfWork {
                 challenge: pow_res.token,
@@ -308,8 +295,6 @@ async fn process_accessibility_success(server: TestContext) -> anyhow::Result<()
         .header("Origin", "http://website-integration.test.com")
         .header("X-Site-Key", site_key.as_str())
         .json(&AccessibilityRequest {
-            // site_key,
-            hostname: "website-integration.test.com".parse()?,
             proof_of_work: ProofOfWork {
                 challenge: pow_res.token,
                 solution: pow_challenge.solve(),
@@ -339,8 +324,6 @@ async fn process_accessibility_fails_on_invalid_proof_of_work(
         .header("Origin", "http://website-integration.test.com")
         .header("X-Site-Key", site_key.as_str())
         .json(&AccessibilityRequest {
-            // site_key,
-            hostname: "website-integration.test.com".parse()?,
             proof_of_work: ProofOfWork { challenge: "".into(), solution: 0 },
         })
         .send()
@@ -366,8 +349,6 @@ async fn process_accessibility_fails_on_proof_of_work_failed(
         .header("Origin", "http://website-integration.test.com")
         .header("X-Site-Key", site_key.as_str())
         .json(&AccessibilityRequest {
-            // site_key,
-            hostname: "website-integration.test.com".parse()?,
             proof_of_work: ProofOfWork { challenge: pow.token, solution: 0 },
         })
         .send()
@@ -394,8 +375,6 @@ async fn process_accessibility_with_wrong_hostname(server: TestContext) -> anyho
         .header("Origin", "http://wrong-website-integration.test.com")
         .header("X-Site-Key", site_key.as_str())
         .json(&AccessibilityRequest {
-            // site_key,
-            hostname: "wrong-website-integration.test.com".parse()?,
             proof_of_work: ProofOfWork {
                 challenge: pow_res.token,
                 solution: pow_challenge.solve(),

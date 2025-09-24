@@ -182,12 +182,12 @@ pub async fn block_bot_agent(
     }
 }
 
-#[instrument(skip_all, fields(origin))]
+#[instrument(skip_all, fields(%origin), err(Debug, level = Level::ERROR))]
 pub async fn validate_hostname(
     State(state): State<Arc<AppState>>,
     SiteKey(site_key): SiteKey,
     TypedHeader(origin): TypedHeader<Origin>,
-    request: Request,
+    mut request: Request,
     next: Next,
 ) -> Result<Response, ChallengeError> {
     let hostname = origin
@@ -202,5 +202,6 @@ pub async fn validate_hostname(
     if !is_allowed_domain {
         return Err(ChallengeError::DomainNotAllowed);
     }
+    request.extensions_mut().insert(hostname);
     Ok(next.run(request).await)
 }
