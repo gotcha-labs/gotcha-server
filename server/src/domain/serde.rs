@@ -6,7 +6,7 @@ pub mod as_string {
     pub fn serialize<S, T>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
-        T: Display,
+        T: ToString,
     {
         serializer.serialize_str(&value.to_string())
     }
@@ -30,7 +30,7 @@ pub mod none_as_empty_string {
     pub fn serialize<S, T>(value: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
-        T: Display,
+        T: ToString,
     {
         match value {
             Some(s) => serializer.serialize_str(&s.to_string()),

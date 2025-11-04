@@ -154,7 +154,6 @@ async fn populate_demo(pool: &PgPool, test_id: &Uuid) -> db::Result<()> {
         &[],
     )
     .await?;
-
     db::update_api_key(
         &mut *txn,
         &site_key,
@@ -165,6 +164,17 @@ async fn populate_demo(pool: &PgPool, test_id: &Uuid) -> db::Result<()> {
         },
     )
     .await?;
+
+    let challenge = DbChallenge {
+        url: "http://127.0.0.1:8080/constellation".to_string(),
+        label: Some("constellation".to_string()),
+        width: 360,
+        height: 500,
+        small_width: 360,
+        small_height: 500,
+        logo_url: None,
+    };
+    let _ = db::insert_challenge(&mut *txn, &challenge).await;
 
     txn.commit().await?;
     Ok(())

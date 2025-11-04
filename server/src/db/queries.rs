@@ -412,20 +412,25 @@ pub async fn fetch_challenges_with_customization(
 ) -> Result<Vec<DbChallenge>> {
     sqlx::query_as!(
         DbChallenge,
-        "select
+        r#"with pool as (select challenge_url from api_key_challenges_pool where site_key = $1)
+        select
             c.url,
             c.label,
-            coalesce(cc.width, c.default_width) as \"width!\",
-            coalesce(cc.height, c.default_height) as \"height!\",
-            coalesce(cc.small_width, c.default_width) as \"small_width!\",
-            coalesce(cc.small_height, c.default_height) as \"small_height!\",
+            coalesce(cc.width, c.default_width) as "width!",
+            coalesce(cc.height, c.default_height) as "height!",
+            coalesce(cc.small_width, c.default_width) as "small_width!",
+            coalesce(cc.small_height, c.default_height) as "small_height!",
             coalesce(cc.logo_url, c.default_logo_url) as logo_url
         from public.challenge c
         left join public.challenge_customization cc on cc.console_id = (
             select console_id
             from public.api_key
             where site_key = $1
-        )",
+        )
+        where
+            (not exists (select 1 from pool)) or
+            c.url in (select challenge_url from pool)
+        "#,
         site_key.as_str(),
     )
     .fetch_all(exec)
@@ -438,7 +443,7 @@ pub async fn insert_challenge(
     challenge: &DbChallenge,
 ) -> Result<()> {
     sqlx::query!(
-        "insert into challenge (url, default_width, default_height, default_logo_url) values ($1, $2, $3, $4)",
+        "insert into challenge (url, default_width, default_height, default_logo_url) values ($1, $2, $3, $4) on conflict (url) do nothing",
         challenge.url,
         challenge.width,
         challenge.height,
@@ -466,6 +471,54 @@ pub async fn delete_challenge_like(
     let res = sqlx::query!("delete from challenge where url like $1", url_pattern)
         .execute(exec)
         .await?;
+    Ok(RowsAffected(res.rows_affected()))
+}
+
+pub async fn fetch_api_key_challenge_pool(
+    exec: impl PgExecutor<'_> + Send,
+    site_key: &Base64<UrlSafe>,
+) -> Result<Vec<String>> {
+    let records = sqlx::query!(
+        r#"
+        select challenge_url as "challenge_url!" from api_key_challenges_pool where site_key = $1
+        union all
+        select url as "challenge_url!" from challenge where not exists (select 1 from api_key_challenges_pool where site_key = $1)
+        "#,
+        site_key.as_str()
+    )
+    .fetch_all(exec)
+    .await?;
+
+    Ok(records.into_iter().map(|r| r.challenge_url).collect())
+}
+
+pub async fn insert_challenge_to_api_key_pool(
+    exec: impl PgExecutor<'_> + Send,
+    site_key: &Base64<UrlSafe>,
+    challenge_url: &str,
+) -> Result<()> {
+    sqlx::query!(
+        "insert into api_key_challenges_pool (site_key, challenge_url) values ($1, $2) on conflict do nothing",
+        site_key.as_str(),
+        challenge_url
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+pub async fn delete_challenge_from_api_key_pool(
+    exec: impl PgExecutor<'_> + Send,
+    site_key: &Base64<UrlSafe>,
+    challenge_url: &str,
+) -> Result<RowsAffected> {
+    let res = sqlx::query!(
+        "delete from api_key_challenges_pool where site_key = $1 and challenge_url = $2",
+        site_key.as_str(),
+        challenge_url
+    )
+    .execute(exec)
+    .await?;
     Ok(RowsAffected(res.rows_affected()))
 }
 

@@ -10,8 +10,9 @@ use challenge::{
     process_pre_analysis,
 };
 use console::{
-    create_console, delete_console, gen_api_key, get_api_keys, get_consoles, revoke_api_key,
-    update_api_key, update_console,
+    add_challenge_to_api_key_pool, create_console, delete_console, gen_api_key,
+    get_api_key_challenge_pool, get_api_keys, get_consoles, remove_challenge_from_api_key_pool,
+    revoke_api_key, update_api_key, update_console,
 };
 use middleware::{
     block_bot_agent, require_admin, require_auth, validate_api_key, validate_console_id,
@@ -68,6 +69,11 @@ pub fn verification(state: &Arc<AppState>) -> Router {
 pub fn console(state: &Arc<AppState>) -> Router {
     let state = Arc::clone(state);
 
+    let challenge_pool = Router::new()
+        .route("/", get(get_api_key_challenge_pool))
+        .route("/", post(add_challenge_to_api_key_pool))
+        .route("/", delete(remove_challenge_from_api_key_pool));
+
     let api_key = Router::new()
         .route("/", get(get_api_keys))
         .route("/", post(gen_api_key))
@@ -76,6 +82,7 @@ pub fn console(state: &Arc<AppState>) -> Router {
             Router::new()
                 .route("/", patch(update_api_key))
                 .route("/", delete(revoke_api_key))
+                .nest("/challenge-pool", challenge_pool)
                 .layer(axum::middleware::from_fn_with_state(
                     Arc::clone(&state),
                     validate_api_key,

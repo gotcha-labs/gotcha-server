@@ -265,7 +265,7 @@ pub struct UpdateChallengePreferences {
     pub logo_url: Option<Option<String>>,
 }
 
-fn validate_update_dimension(
+fn validate_dimension_update(
     input_name: &str,
     value: Option<u16>,
 ) -> Result<Option<i16>, ConsoleError> {
@@ -287,10 +287,10 @@ pub async fn update_challenge_preferences(
         &state.pool,
         &console_id,
         &DbUpdateChallengeCustomization {
-            width: validate_update_dimension("width", update.width)?,
-            height: validate_update_dimension("height", update.height)?,
-            small_width: validate_update_dimension("small_width", update.small_width)?,
-            small_height: validate_update_dimension("small_height", update.small_height)?,
+            width: validate_dimension_update("width", update.width)?,
+            height: validate_dimension_update("height", update.height)?,
+            small_width: validate_dimension_update("small_width", update.small_width)?,
+            small_height: validate_dimension_update("small_height", update.small_height)?,
             logo_url: update.logo_url.as_ref().map(|l| l.as_deref()),
         },
     )
@@ -299,6 +299,83 @@ pub async fn update_challenge_preferences(
     match rows_affected {
         RowsAffected(0) => Err(ConsoleError::NotFound {
             what: format!("challenge preferences for console with id {console_id}"),
+        }),
+        RowsAffected(_) => Ok(()),
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ApiKeyChallengePoolResponse {
+    pub challenges: Vec<String>,
+}
+
+/// Gets the challenge pool for a given api key.
+#[instrument(skip_all, ret(Debug, level = Level::DEBUG), err(Debug, level = Level::ERROR))]
+pub async fn get_api_key_challenge_pool(
+    State(state): State<Arc<AppState>>,
+    Path((console_id, site_key)): Path<(Uuid, Base64<UrlSafe>)>,
+) -> Result<Json<ApiKeyChallengePoolResponse>, ConsoleError> {
+    let pool = db::fetch_api_key_challenge_pool(&state.pool, &site_key)
+        .await
+        .with_context(|| {
+            format!("failed to fetch challenge pool for api key '{site_key}' for console id '{console_id}'")
+        })?;
+    Ok(Json(ApiKeyChallengePoolResponse { challenges: pool }))
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChallengeApiKeyPoolRequest {
+    pub challenge_url: String,
+}
+
+/// Adds a challenge to the pool of an api key.
+#[instrument(skip(state), ret(Debug, level = Level::DEBUG), err(Debug, level = Level::ERROR))]
+pub async fn add_challenge_to_api_key_pool(
+    State(state): State<Arc<AppState>>,
+    Path((console_id, site_key)): Path<(Uuid, Base64<UrlSafe>)>,
+    Json(request): Json<ChallengeApiKeyPoolRequest>,
+) -> Result<(), ConsoleError> {
+    db::insert_challenge_to_api_key_pool(&state.pool, &site_key, &request.challenge_url)
+        .await
+        .map_err(|err| match err {
+            db::Error::Constraint { source: _, kind: db::ConstraintKind::ForeignKey } => {
+                ConsoleError::NotFound {
+                    what: format!("challenge with url '{}'", request.challenge_url),
+                }
+            }
+            other_err => anyhow::Error::new(other_err)
+                .context(format!(
+                    "failed to insert challenge '{}' to api key '{site_key}' for console id '{}'",
+                    request.challenge_url, console_id
+                ))
+                .into(),
+        })?;
+
+    Ok(())
+}
+
+/// Removes a challenge from the pool of an api key.
+#[instrument(skip(state), ret(Debug, level = Level::DEBUG), err(Debug, level = Level::ERROR))]
+pub async fn remove_challenge_from_api_key_pool(
+    State(state): State<Arc<AppState>>,
+    Path((console_id, site_key)): Path<(Uuid, Base64<UrlSafe>)>,
+    Json(request): Json<ChallengeApiKeyPoolRequest>,
+) -> Result<(), ConsoleError> {
+    let rows_affected =
+        db::delete_challenge_from_api_key_pool(&state.pool, &site_key, &request.challenge_url)
+            .await
+            .with_context(|| {
+                format!(
+                    "failed to delete challenge '{}' from api key '{site_key}' for console id '{}'",
+                    request.challenge_url, console_id
+                )
+            })?;
+    match rows_affected {
+        RowsAffected(0) => Err(ConsoleError::NotFound {
+            what: format!(
+                "challenge '{}' in pool for sitekey {} for console with id {}",
+                request.challenge_url, site_key, console_id
+            ),
         }),
         RowsAffected(_) => Ok(()),
     }

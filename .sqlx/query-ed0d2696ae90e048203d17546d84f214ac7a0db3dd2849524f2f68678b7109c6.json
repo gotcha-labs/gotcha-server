@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "insert into api_key_challenges_pool (site_key, challenge_url) values ($1, $2) on conflict do nothing",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ed0d2696ae90e048203d17546d84f214ac7a0db3dd2849524f2f68678b7109c6"
+}

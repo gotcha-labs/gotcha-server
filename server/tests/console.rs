@@ -3,8 +3,9 @@ use gotcha_server::{
     db::{self, DbChallengeCustomization, RowsAffected},
     encodings::{Base64, KEY_SIZE, UrlSafe},
     routes::console::{
-        ApiKeyResponse, ChallengePreferences, ConsoleResponse, CreateConsoleRequest,
-        UpdateApiKeyRequest, UpdateConsoleRequest,
+        ApiKeyChallengePoolResponse, ApiKeyResponse, ChallengeApiKeyPoolRequest,
+        ChallengePreferences, ConsoleResponse, CreateConsoleRequest, UpdateApiKeyRequest,
+        UpdateConsoleRequest,
     },
     test_helpers,
 };
@@ -470,6 +471,141 @@ async fn update_partially_challenge_preferences_2(server: TestContext) -> anyhow
         curr_preferences.logo_url,
         Some("http://integration-test.com/logo.svg".into())
     );
+
+    Ok(())
+}
+
+#[integration_test]
+async fn api_key_challenge_pool(server: TestContext) -> anyhow::Result<()> {
+    let port = server.port();
+    let pool = server.pool();
+    let console_id = server.db_console().await;
+    let site_key = server.db_api_site_key().await;
+
+    // Get initial pool
+    let all_challenges = db::fetch_challenges(pool).await?;
+    let all_challenge_urls: Vec<String> = all_challenges.into_iter().map(|c| c.url).collect();
+    assert!(
+        !all_challenge_urls.is_empty(),
+        "populate_demo should insert at least one challenge"
+    );
+
+    let response = HTTP_CLIENT
+        .get(format!(
+            "http://localhost:{port}/api/console/{console_id}/api-key/{site_key}/challenge-pool"
+        ))
+        .bearer_auth(test_helpers::auth_jwt().await)
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let pool_resp: ApiKeyChallengePoolResponse = response.json().await?;
+    assert_eq!(pool_resp.challenges.len(), all_challenge_urls.len());
+    assert!(
+        pool_resp
+            .challenges
+            .iter()
+            .all(|c| all_challenge_urls.contains(c))
+    );
+
+    // Add a challenge to the pool.
+    let challenge_to_add = all_challenge_urls.first().unwrap();
+
+    let response = HTTP_CLIENT
+        .post(format!(
+            "http://localhost:{port}/api/console/{console_id}/api-key/{site_key}/challenge-pool"
+        ))
+        .bearer_auth(test_helpers::auth_jwt().await)
+        .json(&ChallengeApiKeyPoolRequest { challenge_url: challenge_to_add.clone() })
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Get pool again
+    let response = HTTP_CLIENT
+        .get(format!(
+            "http://localhost:{port}/api/console/{console_id}/api-key/{site_key}/challenge-pool"
+        ))
+        .bearer_auth(test_helpers::auth_jwt().await)
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let pool_resp: ApiKeyChallengePoolResponse = response.json().await?;
+    assert_eq!(pool_resp.challenges, vec![challenge_to_add.clone()]);
+
+    // Remove the challenge from the pool
+    let response = HTTP_CLIENT
+        .delete(format!(
+            "http://localhost:{port}/api/console/{console_id}/api-key/{site_key}/challenge-pool"
+        ))
+        .bearer_auth(test_helpers::auth_jwt().await)
+        .json(&ChallengeApiKeyPoolRequest { challenge_url: challenge_to_add.clone() })
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Get pool again
+    let response = HTTP_CLIENT
+        .get(format!(
+            "http://localhost:{port}/api/console/{console_id}/api-key/{site_key}/challenge-pool"
+        ))
+        .bearer_auth(test_helpers::auth_jwt().await)
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let pool_resp: ApiKeyChallengePoolResponse = response.json().await?;
+    assert_eq!(pool_resp.challenges.len(), all_challenge_urls.len());
+    assert!(
+        pool_resp
+            .challenges
+            .iter()
+            .all(|c| all_challenge_urls.contains(c))
+    );
+
+    Ok(())
+}
+
+#[integration_test]
+async fn add_nonexistent_challenge_to_pool(server: TestContext) -> anyhow::Result<()> {
+    let port = server.port();
+    let console_id = server.db_console().await;
+    let site_key = server.db_api_site_key().await;
+
+    let challenge_url = "http://integration-test.com/non-existent-challenge.html";
+
+    let response = HTTP_CLIENT
+        .post(format!(
+            "http://localhost:{port}/api/console/{console_id}/api-key/{site_key}/challenge-pool"
+        ))
+        .bearer_auth(test_helpers::auth_jwt().await)
+        .json(&ChallengeApiKeyPoolRequest { challenge_url: challenge_url.to_string() })
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+    Ok(())
+}
+
+#[integration_test]
+async fn remove_challenge_not_in_pool(server: TestContext) -> anyhow::Result<()> {
+    let pool = server.pool();
+    let port = server.port();
+    let console_id = server.db_console().await;
+    let site_key = server.db_api_site_key().await;
+
+    let challenge_url = "http://integration-test.com/not-in-pool-challenge.html";
+    db::insert_challenge(pool, &db::DbChallenge::new(challenge_url.to_string())).await?;
+
+    let response = HTTP_CLIENT
+        .delete(format!(
+            "http://localhost:{port}/api/console/{console_id}/api-key/{site_key}/challenge-pool"
+        ))
+        .bearer_auth(test_helpers::auth_jwt().await)
+        .json(&ChallengeApiKeyPoolRequest { challenge_url: challenge_url.to_string() })
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+    db::delete_challenge(pool, challenge_url).await?;
 
     Ok(())
 }
