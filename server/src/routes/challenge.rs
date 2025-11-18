@@ -35,6 +35,8 @@ use crate::{
 pub struct GetChallenge {
     /// Public URL.
     pub url: Url,
+    /// Label.
+    pub label: Option<String>,
     /// Desktop width.
     pub width: u16,
     /// Desktop height.
@@ -64,6 +66,23 @@ pub async fn get_challenge(
     let challenge = choose_challenge(challenges).ok_or(ChallengeError::NoMatchingChallenge)?;
 
     Ok(Json(challenge.try_into()?))
+}
+
+/// Fetches all available challenges.
+#[instrument(skip(state), ret(Debug, level = Level::DEBUG), err(Debug, level = Level::ERROR))]
+pub async fn get_all_challenges(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Vec<GetChallenge>>, ChallengeError> {
+    let challenges = db::fetch_challenges(&state.pool)
+        .await
+        .context("failed to fetch challenges")?;
+
+    Ok(Json(
+        challenges
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<_, anyhow::Error>>()?,
+    ))
 }
 
 /// Response payload of get proof of work route.
@@ -319,6 +338,7 @@ impl TryFrom<DbChallenge> for GetChallenge {
 
         Ok(GetChallenge {
             url,
+            label: db_challenge.label,
             width: db_challenge.width as u16,
             height: db_challenge.height as u16,
             small_width: db_challenge.small_width as u16,

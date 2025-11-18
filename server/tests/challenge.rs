@@ -27,7 +27,6 @@ async fn get_pow_helper(port: u16, site_key: &Base64<UrlSafe>) -> anyhow::Result
         .await?)
 }
 
-#[ignore = "TODO: insert challenge and then request"]
 #[integration_test]
 async fn get_challenge(server: TestContext) -> anyhow::Result<()> {
     let port = server.port();
@@ -52,6 +51,20 @@ async fn get_challenge_fails(server: TestContext) -> anyhow::Result<()> {
         .send()
         .await?;
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+    Ok(())
+}
+
+#[integration_test]
+async fn get_all_challenges(server: TestContext) -> anyhow::Result<()> {
+    let port = server.port();
+
+    let response = HTTP_CLIENT
+        .get(format!("http://localhost:{port}/api/challenge/all"))
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let _challenges: Vec<GetChallenge> = response.json().await?;
 
     Ok(())
 }

@@ -22,6 +22,7 @@ use verification::site_verify;
 use crate::{
     AppState,
     routes::{
+        challenge::get_all_challenges,
         console::{get_challenge_preferences, update_challenge_preferences},
         middleware::validate_hostname,
     },
@@ -40,6 +41,7 @@ pub fn challenge(state: &Arc<AppState>) -> Router {
     let state = Arc::clone(state);
     Router::new()
         .route("/", get(get_challenge))
+        .route("/all", get(get_all_challenges))
         .route("/proof-of-work", get(get_proof_of_work_challenge))
         .merge(
             Router::new()

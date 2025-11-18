@@ -478,18 +478,13 @@ pub async fn fetch_api_key_challenge_pool(
     exec: impl PgExecutor<'_> + Send,
     site_key: &Base64<UrlSafe>,
 ) -> Result<Vec<String>> {
-    let records = sqlx::query!(
-        r#"
-        select challenge_url as "challenge_url!" from api_key_challenges_pool where site_key = $1
-        union all
-        select url as "challenge_url!" from challenge where not exists (select 1 from api_key_challenges_pool where site_key = $1)
-        "#,
+    sqlx::query_scalar!(
+        "select challenge_url from api_key_challenges_pool where site_key = $1",
         site_key.as_str()
     )
     .fetch_all(exec)
-    .await?;
-
-    Ok(records.into_iter().map(|r| r.challenge_url).collect())
+    .await
+    .map(Ok)?
 }
 
 pub async fn insert_challenge_to_api_key_pool(

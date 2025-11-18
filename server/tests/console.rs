@@ -483,13 +483,6 @@ async fn api_key_challenge_pool(server: TestContext) -> anyhow::Result<()> {
     let site_key = server.db_api_site_key().await;
 
     // Get initial pool
-    let all_challenges = db::fetch_challenges(pool).await?;
-    let all_challenge_urls: Vec<String> = all_challenges.into_iter().map(|c| c.url).collect();
-    assert!(
-        !all_challenge_urls.is_empty(),
-        "populate_demo should insert at least one challenge"
-    );
-
     let response = HTTP_CLIENT
         .get(format!(
             "http://localhost:{port}/api/console/{console_id}/api-key/{site_key}/challenge-pool"
@@ -499,15 +492,15 @@ async fn api_key_challenge_pool(server: TestContext) -> anyhow::Result<()> {
         .await?;
     assert_eq!(response.status(), StatusCode::OK);
     let pool_resp: ApiKeyChallengePoolResponse = response.json().await?;
-    assert_eq!(pool_resp.challenges.len(), all_challenge_urls.len());
-    assert!(
-        pool_resp
-            .challenges
-            .iter()
-            .all(|c| all_challenge_urls.contains(c))
-    );
+    assert_eq!(pool_resp.challenges.len(), 0);
 
-    // Add a challenge to the pool.
+    // Add a challenge to the pool
+    let all_challenges = db::fetch_challenges(pool).await?;
+    let all_challenge_urls: Vec<String> = all_challenges.into_iter().map(|c| c.url).collect();
+    assert!(
+        !all_challenge_urls.is_empty(),
+        "populate_demo should insert at least one challenge"
+    );
     let challenge_to_add = all_challenge_urls.first().unwrap();
 
     let response = HTTP_CLIENT
@@ -553,13 +546,7 @@ async fn api_key_challenge_pool(server: TestContext) -> anyhow::Result<()> {
         .await?;
     assert_eq!(response.status(), StatusCode::OK);
     let pool_resp: ApiKeyChallengePoolResponse = response.json().await?;
-    assert_eq!(pool_resp.challenges.len(), all_challenge_urls.len());
-    assert!(
-        pool_resp
-            .challenges
-            .iter()
-            .all(|c| all_challenge_urls.contains(c))
-    );
+    assert_eq!(pool_resp.challenges.len(), 0);
 
     Ok(())
 }
