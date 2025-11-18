@@ -9,8 +9,9 @@ use axum::{
 };
 use axum_extra::{
     TypedHeader,
-    headers::{Authorization, UserAgent, authorization::Bearer},
+    headers::{Authorization, Origin, UserAgent, authorization::Bearer},
 };
+
 use isbot::Bots;
 use jsonwebtoken::{DecodingKey, jwk::JwkSet};
 use serde::Deserialize;
@@ -18,7 +19,15 @@ use thiserror::Error;
 use tracing::{Level, Span, field, instrument};
 use uuid::Uuid;
 
-use crate::{AppState, HTTP_CACHE_CLIENT, db, routes::extractors::User, tokens};
+use crate::{
+    AppState, HTTP_CACHE_CLIENT, db,
+    encodings::{Base64, UrlSafe},
+    routes::{
+        errors::ChallengeError,
+        extractors::{SiteKey, User},
+    },
+    tokens,
+};
 
 use super::errors::ConsoleError;
 
@@ -115,7 +124,7 @@ pub async fn validate_console_id(
 
 #[derive(Debug, Deserialize)]
 pub struct ApiKeyPath {
-    pub site_key: String,
+    pub site_key: Base64<UrlSafe>,
 }
 
 #[instrument(skip_all, fields(site_key, console_id), err(Debug, level = Level::ERROR))]
@@ -129,7 +138,7 @@ pub async fn validate_api_key(
     match db::exists_api_key_for_console(&state.pool, &site_key, &console_id).await? {
         true => Ok(next.run(request).await),
         false => {
-            Span::current().record("site_key", site_key);
+            Span::current().record("site_key", site_key.as_str());
             Span::current().record("console_id", field::display(console_id));
             Err(ConsoleError::Forbidden)
         }
@@ -171,4 +180,28 @@ pub async fn block_bot_agent(
             StatusCode::FORBIDDEN.into_response()
         }
     }
+}
+
+#[instrument(skip_all, fields(%origin), err(Debug, level = Level::ERROR))]
+pub async fn validate_hostname(
+    State(state): State<Arc<AppState>>,
+    SiteKey(site_key): SiteKey,
+    TypedHeader(origin): TypedHeader<Origin>,
+    mut request: Request,
+    next: Next,
+) -> Result<Response, ChallengeError> {
+    let hostname = origin
+        .hostname()
+        .parse()
+        .map_err(|_| ChallengeError::InvalidOrigin)?;
+
+    let is_allowed_domain = db::exists_allowed_domain_in_api_key(&state.pool, &site_key, &hostname)
+        .await?
+        .ok_or(ChallengeError::InvalidKey)?;
+
+    if !is_allowed_domain {
+        return Err(ChallengeError::DomainNotAllowed);
+    }
+    request.extensions_mut().insert(hostname);
+    Ok(next.run(request).await)
 }

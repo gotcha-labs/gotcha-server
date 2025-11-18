@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "delete from api_key_challenges_pool where site_key = $1 and challenge_url = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9998e9d45a4690a5620a4749a91d56d456677efc29d82055fe1b5e59c5ac28c8"
+}

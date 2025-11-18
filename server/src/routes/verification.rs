@@ -9,9 +9,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use time::OffsetDateTime;
 use tracing::{Level, instrument};
-use url::Host;
 
-use crate::{AppState, db, encodings::Base64, tokens::response};
+use crate::{AppState, db, domain::hostname::Hostname, encodings::Base64, tokens::response};
 
 use super::errors::VerificationError;
 
@@ -27,8 +26,8 @@ pub struct VerificationResponse {
     pub success: bool,
     #[serde(with = "time::serde::iso8601")]
     pub challenge_ts: OffsetDateTime,
-    #[serde(with = "crate::serde::option_host_as_str")]
-    pub hostname: Option<Host>,
+    #[serde(with = "crate::serde::none_as_empty_string")]
+    pub hostname: Option<Hostname>,
     #[serde(rename = "error-codes", skip_serializing_if = "Option::is_none")]
     pub error_codes: Option<Vec<ErrorCodes>>,
 }
@@ -55,20 +54,28 @@ pub async fn site_verify(
     let verification: Result<VerificationRequest, Vec<ErrorCodes>> = verification.try_into();
     let verification = verification.map_err(VerificationResponse::failure)?;
 
-    let enc_key = db::fetch_api_key_by_secret(&state.pool, verification.secret.expose_secret())
+    let api_key = db::fetch_api_key_by_secret(&state.pool, verification.secret.expose_secret())
         .await
         .context("failed to fetch encoding key bey api secret while verifying challenge")?
         .ok_or(VerificationResponse::failure(vec![
             ErrorCodes::InvalidInputSecret,
-        ]))?
-        .encoding_key;
+        ]))?;
 
-    let claims = response::decode(&verification.response, &enc_key)
+    let claims = response::decode(&verification.response, &api_key.encoding_key)
         .map_err(|err| match err.into_kind() {
             ErrorKind::ExpiredSignature => ErrorCodes::TimeoutOrDuplicate,
             _ => ErrorCodes::InvalidInputResponse,
         })
         .map_err(|err_code| VerificationResponse::failure(vec![err_code]))?;
+
+    let is_allowed_domain = api_key
+        .allowed_domains
+        .iter()
+        .any(|domain| domain == &claims.other.host);
+
+    if !is_allowed_domain {
+        return Err(VerificationResponse::failure(vec![ErrorCodes::TimeoutOrDuplicate]).into());
+    }
 
     let solver_check = verification
         .remoteip

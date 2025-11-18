@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "insert into challenge (url, default_width, default_height, default_logo_url) values ($1, $2, $3, $4) on conflict (url) do nothing",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Int2",
+        "Int2",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c46d5c000e73944273fa94092e6f46dfc0f31949567d7b47e3eeb96b3529aec4"
+}

@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "with pool as (select challenge_url from api_key_challenges_pool where site_key = $1)\n        select\n            c.url,\n            c.label,\n            coalesce(cc.width, c.default_width) as \"width!\",\n            coalesce(cc.height, c.default_height) as \"height!\",\n            coalesce(cc.small_width, c.default_width) as \"small_width!\",\n            coalesce(cc.small_height, c.default_height) as \"small_height!\",\n            coalesce(cc.logo_url, c.default_logo_url) as logo_url\n        from public.challenge c\n        left join public.challenge_customization cc on cc.console_id = (\n            select console_id\n            from public.api_key\n            where site_key = $1\n        )\n        where\n            (not exists (select 1 from pool)) or\n            c.url in (select challenge_url from pool)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "url",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "label",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "width!",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 3,
+        "name": "height!",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 4,
+        "name": "small_width!",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 5,
+        "name": "small_height!",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 6,
+        "name": "logo_url",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "6217a81b3eec55a7a7c2a3a6027911d57a1a41ec799224e9115795b7661a4bf7"
+}

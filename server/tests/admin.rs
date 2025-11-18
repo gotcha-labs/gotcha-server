@@ -104,7 +104,7 @@ async fn add_challenge_already_exists(server: TestContext) -> anyhow::Result<()>
         .json(&AddChallenge { url: url.clone(), width: 50, height: 50 })
         .send()
         .await?;
-    assert_eq!(response.status(), StatusCode::CONFLICT);
+    assert_eq!(response.status(), StatusCode::OK);
 
     Ok(())
 }

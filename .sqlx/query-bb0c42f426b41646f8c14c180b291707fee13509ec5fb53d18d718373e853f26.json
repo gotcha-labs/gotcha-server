@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select challenge_url from api_key_challenges_pool where site_key = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "challenge_url",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "bb0c42f426b41646f8c14c180b291707fee13509ec5fb53d18d718373e853f26"
+}

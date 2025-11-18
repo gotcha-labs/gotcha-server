@@ -15,12 +15,16 @@ use super::verification::{ErrorCodes, VerificationResponse};
 pub enum ChallengeError {
     #[error("Invalid key")]
     InvalidKey,
+    #[error("Invalid origin header")]
+    InvalidOrigin,
     #[error("Invalid proof of work challenge")]
     InvalidProofOfWork(#[from] jsonwebtoken::errors::Error),
     #[error("Failed proof of work challenge")]
     FailedProofOfWork,
     #[error("No matching challenge")]
     NoMatchingChallenge,
+    #[error("Domain not allowed, add this domain to the list of allowed domains")]
+    DomainNotAllowed,
     #[error(transparent)]
     Unexpected(#[from] anyhow::Error),
 }
@@ -34,6 +38,9 @@ impl IntoResponse for ChallengeError {
                 other => Some(other.into_response()),
             }),
             ChallengeError::InvalidKey => (StatusCode::FORBIDDEN, self.to_string()).into_response(),
+            ChallengeError::InvalidOrigin => {
+                (StatusCode::UNPROCESSABLE_ENTITY, self.to_string()).into_response()
+            }
             ChallengeError::InvalidProofOfWork(_) => {
                 (StatusCode::BAD_REQUEST, self.to_string()).into_response()
             }
@@ -42,6 +49,9 @@ impl IntoResponse for ChallengeError {
             }
             ChallengeError::NoMatchingChallenge => {
                 (StatusCode::NOT_FOUND, self.to_string()).into_response()
+            }
+            ChallengeError::DomainNotAllowed => {
+                (StatusCode::FORBIDDEN, self.to_string()).into_response()
             }
         }
     }
