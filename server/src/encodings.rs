@@ -8,13 +8,17 @@ use rand::{Rng, RngCore};
 use secrecy::Zeroize;
 use serde::{Deserialize, Serialize};
 
+/// Default key size in bytes.
 pub const KEY_SIZE: usize = 48;
 
+/// Standard base64 alphabet marker.
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Standard;
+/// URL-safe base64 alphabet marker.
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UrlSafe;
 
+/// Base64 encoded string wrapper.
 #[derive(Serialize, Deserialize, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(transparent)]
 pub struct Base64<A = Standard>(Box<str>, PhantomData<A>);
@@ -24,28 +28,33 @@ impl<A> Base64<A> {
         Base64(value.into_boxed_str(), PhantomData)
     }
 
+    /// Returns the underlying string slice.
     pub fn as_str(&self) -> &str {
         &self.0
     }
 }
 
 impl Base64<Standard> {
+    /// Generates a random base64 string.
     pub fn random<const N: usize>() -> Self {
         let mut rng = rand::rng();
         Self::new(BASE64_STANDARD.encode(rng.random::<[u8; N]>()))
     }
 
+    /// Generates a random base64 string using provided RNG.
     pub fn random_with<const N: usize>(mut rng: impl RngCore) -> Self {
         Self::new(BASE64_STANDARD.encode(rng.random::<[u8; N]>()))
     }
 }
 
 impl Base64<UrlSafe> {
+    /// Generates a random URL-safe base64 string.
     pub fn random<const N: usize>() -> Self {
         let mut rng = rand::rng();
         Self::new(BASE64_URL_SAFE.encode(rng.random::<[u8; N]>()))
     }
 
+    /// Generates a random URL-safe base64 string using provided RNG.
     pub fn random_with<const N: usize>(mut rng: impl RngCore) -> Self {
         Self::new(BASE64_URL_SAFE.encode(rng.random::<[u8; N]>()))
     }

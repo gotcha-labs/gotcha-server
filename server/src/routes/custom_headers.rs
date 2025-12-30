@@ -5,6 +5,7 @@ use axum_extra::headers::Header;
 
 use crate::encodings::{Base64, UrlSafe};
 
+/// Custom header for passing the site key.
 #[derive(Debug, Clone)]
 pub struct XSiteKey(pub Base64<UrlSafe>);
 

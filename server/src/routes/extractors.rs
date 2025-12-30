@@ -15,6 +15,7 @@ use crate::{
 };
 
 #[cfg(feature = "aws-lambda")]
+/// Extracts source IP from lambda context.
 pub fn extract_lambda_source_ip<B>(mut request: Request<B>) -> Request<B> {
     use axum::extract::ConnectInfo;
     use lambda_http::{RequestExt, request::RequestContext};
@@ -68,6 +69,7 @@ pub fn extract_lambda_source_ip<B>(mut request: Request<B>) -> Request<B> {
 //     request
 // }
 
+/// Origin extractor.
 #[derive(Debug, Clone)]
 pub struct ThisOrigin(pub String);
 
@@ -89,6 +91,7 @@ where
     }
 }
 
+/// User extractor.
 #[derive(Debug, Clone)]
 pub struct User {
     pub user_id: Arc<str>,
@@ -109,6 +112,7 @@ where
     }
 }
 
+/// Site key extractor.
 #[derive(Debug, Clone)]
 pub struct SiteKey(pub Base64<UrlSafe>);
 

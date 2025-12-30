@@ -60,13 +60,15 @@ impl TryFrom<DbApiKeyInternal> for DbApiKey {
                 .context("could not convert secret from string")?,
             allowed_domains: value
                 .allowed_domains
-                .into_iter()
-                .map(Hostname::new_unchecked)
-                .collect(),
+                .iter()
+                .map(String::as_str)
+                .map(Hostname::parse)
+                .collect::<::core::result::Result<_, _>>()?,
         })
     }
 }
 
+/// Tries to fetch the `api_key` given the `site_key`.
 pub async fn fetch_api_key_by_site_key(
     exec: impl PgExecutor<'_> + Send,
     site_key: &Base64<UrlSafe>,
@@ -82,6 +84,7 @@ pub async fn fetch_api_key_by_site_key(
     .map(Ok)?
 }
 
+/// Tries to fetch the `api_key` given the `secret`.
 pub async fn fetch_api_key_by_secret(
     exec: impl PgExecutor<'_> + Send,
     secret: &Base64,
@@ -97,6 +100,7 @@ pub async fn fetch_api_key_by_secret(
     .map(Ok)?
 }
 
+/// Fetches all the `api_keys` for the given `console_id`.
 pub async fn fetch_api_keys(
     exec: impl PgExecutor<'_> + Send,
     console_id: &Uuid,
@@ -112,6 +116,7 @@ pub async fn fetch_api_keys(
     .map(Ok)?
 }
 
+/// Inserts a new `api_key`.
 pub async fn insert_api_key(
     exec: impl PgExecutor<'_> + Send,
     site_key: &Base64<UrlSafe>,
@@ -139,6 +144,7 @@ pub async fn insert_api_key(
     Ok(())
 }
 
+/// Checks if an `api_key` identified by the `site_key` exists for a given console.
 pub async fn exists_api_key_for_console(
     exec: impl PgExecutor<'_> + Send,
     site_key: &Base64<UrlSafe>,
@@ -155,6 +161,7 @@ pub async fn exists_api_key_for_console(
     .map(Ok)?
 }
 
+/// Checks if a domain is in the allowed list for a given `api_key`.
 pub async fn exists_allowed_domain_in_api_key(
     exec: impl PgExecutor<'_> + Send,
     site_key: &Base64<UrlSafe>,
@@ -212,12 +219,16 @@ pub(crate) async fn with_console_insert_api_key(
     Ok(row.console_id)
 }
 
+/// Holds fields to update an `api_key`.
 #[derive(Debug)]
 pub struct DbUpdateApiKey<'a> {
+    /// Optionally update the label.
     pub label: Option<&'a str>,
+    /// Optionally update allowed domains list.
     pub allowed_domains: Option<&'a [Hostname]>,
 }
 
+/// Updates an existing `api_keys`.
 pub async fn update_api_key(
     exec: impl PgExecutor<'_> + Send,
     site_key: &Base64<UrlSafe>,
@@ -241,6 +252,7 @@ pub async fn update_api_key(
     Ok(RowsAffected(res.rows_affected()))
 }
 
+/// Deletes an existing `api_key`.
 pub async fn delete_api_key(
     exec: impl PgExecutor<'_> + Send,
     site_key: &Base64<UrlSafe>,
@@ -256,12 +268,14 @@ pub async fn delete_api_key(
     Ok(RowsAffected(res.rows_affected()))
 }
 
+/// Database `console` representation.
 #[derive(Debug)]
 pub struct DbConsole {
     pub id: Uuid,
     pub label: Option<String>,
 }
 
+/// Fetches all associated `console`s for a given user.
 pub async fn fetch_consoles(
     exec: impl PgExecutor<'_> + Send,
     user: &str,
@@ -276,6 +290,8 @@ pub async fn fetch_consoles(
     .map(Ok)?
 }
 
+/// Helper for fetching a `console` by the label. Used for tests.
+#[doc(hidden)]
 pub async fn fetch_console_by_label(
     exec: impl PgExecutor<'_> + Send,
     label: &str,
@@ -286,6 +302,7 @@ pub async fn fetch_console_by_label(
         .map(Ok)?
 }
 
+/// Checks if a `console` belongs to a given user.
 pub async fn exists_console_for_user(
     exec: impl PgExecutor<'_> + Send,
     console_id: &Uuid,
@@ -302,6 +319,7 @@ pub async fn exists_console_for_user(
     .map(Ok)?
 }
 
+/// Inserts a new `console`.
 pub async fn insert_console(
     txn: &mut Transaction<'_, Postgres>,
     label: &str,
@@ -332,11 +350,14 @@ async fn insert_only_console(
     .map(Ok)?
 }
 
+/// Holds fields to update a `console`.
 #[derive(Debug)]
 pub struct DbUpdateConsole<'a> {
+    /// Optionally update label.
     pub label: Option<&'a str>,
 }
 
+/// Updates an existing `console`.
 pub async fn update_console(
     exec: impl PgExecutor<'_> + Send,
     id: &Uuid,
@@ -353,6 +374,7 @@ pub async fn update_console(
     Ok(RowsAffected(res.rows_affected()))
 }
 
+/// Deletes an existing `console`.
 pub async fn delete_console(
     exec: impl PgExecutor<'_> + Send,
     console_id: &Uuid,
@@ -363,6 +385,7 @@ pub async fn delete_console(
     Ok(RowsAffected(res.rows_affected()))
 }
 
+/// Database `challenge` representation.
 #[derive(Debug)]
 pub struct DbChallenge {
     pub url: String,
@@ -388,6 +411,7 @@ impl DbChallenge {
     }
 }
 
+/// Fetches all `challenge`s.
 pub async fn fetch_challenges(exec: impl PgExecutor<'_> + Send) -> Result<Vec<DbChallenge>> {
     sqlx::query_as!(
         DbChallenge,
@@ -406,6 +430,7 @@ pub async fn fetch_challenges(exec: impl PgExecutor<'_> + Send) -> Result<Vec<Db
     .map(Ok)?
 }
 
+/// Fetches all `challenge`s and merges challenge customizations for a given `api_key`.
 pub async fn fetch_challenges_with_customization(
     exec: impl PgExecutor<'_> + Send,
     site_key: &Base64<UrlSafe>,
@@ -438,6 +463,7 @@ pub async fn fetch_challenges_with_customization(
     .map(Ok)?
 }
 
+/// Inserts a new `challenge`.
 pub async fn insert_challenge(
     exec: impl PgExecutor<'_> + Send,
     challenge: &DbChallenge,
@@ -454,6 +480,7 @@ pub async fn insert_challenge(
     Ok(())
 }
 
+/// Deletes an existing `challenge`.
 pub async fn delete_challenge(
     exec: impl PgExecutor<'_> + Send,
     challenge_url: &str,
@@ -464,6 +491,7 @@ pub async fn delete_challenge(
     Ok(RowsAffected(res.rows_affected()))
 }
 
+/// Deletes an existing `challenge` with a given pattern of URL.
 pub async fn delete_challenge_like(
     exec: impl PgExecutor<'_> + Send,
     url_pattern: &str,
@@ -474,6 +502,7 @@ pub async fn delete_challenge_like(
     Ok(RowsAffected(res.rows_affected()))
 }
 
+/// Fetches the `challenge` URLs inside the pool of a given `api_key`.
 pub async fn fetch_api_key_challenge_pool(
     exec: impl PgExecutor<'_> + Send,
     site_key: &Base64<UrlSafe>,
@@ -487,6 +516,7 @@ pub async fn fetch_api_key_challenge_pool(
     .map(Ok)?
 }
 
+/// Inserts a challenge to the `api_key` pool.
 pub async fn insert_challenge_to_api_key_pool(
     exec: impl PgExecutor<'_> + Send,
     site_key: &Base64<UrlSafe>,
@@ -502,6 +532,7 @@ pub async fn insert_challenge_to_api_key_pool(
     Ok(())
 }
 
+/// Deletes a challenge of the `api_key` pool.
 pub async fn delete_challenge_from_api_key_pool(
     exec: impl PgExecutor<'_> + Send,
     site_key: &Base64<UrlSafe>,
@@ -517,6 +548,7 @@ pub async fn delete_challenge_from_api_key_pool(
     Ok(RowsAffected(res.rows_affected()))
 }
 
+/// Database challenge customization representation.
 #[derive(Debug, PartialEq, Eq)]
 pub struct DbChallengeCustomization {
     pub width: i16,
@@ -538,6 +570,7 @@ impl Default for DbChallengeCustomization {
     }
 }
 
+/// Fetches the challenge customization for a given `console`.
 pub async fn fetch_challenge_customization(
     exec: impl PgExecutor<'_> + Send,
     console_id: &Uuid,
@@ -552,6 +585,7 @@ pub async fn fetch_challenge_customization(
     .map(Ok)?
 }
 
+/// Inserts a new challenge customization for a given `console`.
 pub async fn insert_challenge_customization(
     exec: impl PgExecutor<'_> + Send,
     console_id: &Uuid,
@@ -572,15 +606,22 @@ pub async fn insert_challenge_customization(
     Ok(())
 }
 
+/// Holds fields to update a challenge customization.
 #[derive(Debug)]
 pub struct DbUpdateChallengeCustomization<'a> {
+    /// Optionally update wdith.
     pub width: Option<i16>,
+    /// Optionally update height.
     pub height: Option<i16>,
+    /// Optionally update mobile width,
     pub small_width: Option<i16>,
+    /// Optionally update mobile height,
     pub small_height: Option<i16>,
+    /// Optionally update logo.
     pub logo_url: Option<Option<&'a str>>,
 }
 
+/// Updates a challenge customization for a given `console`.
 pub async fn update_challenge_customization(
     exec: impl PgExecutor<'_> + Send,
     console_id: &Uuid,
