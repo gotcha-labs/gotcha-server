@@ -6,8 +6,10 @@ use crate::{domain::hostname::Hostname, encodings::Base64};
 
 use super::TimeClaims;
 
+/// Algorithm used for response tokens.
 pub static JWT_RESPONSE_ALGORITHM: Algorithm = Algorithm::HS256;
 
+/// Claims contained in the response token.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ResponseClaims {
     pub score: f32,
@@ -15,6 +17,7 @@ pub struct ResponseClaims {
     pub host: Hostname,
 }
 
+/// Encodes response claims into a JWT.
 pub fn encode(
     response_claims: ResponseClaims,
     enc_key: &Base64,
@@ -26,6 +29,7 @@ pub fn encode(
     )
 }
 
+/// Encodes response claims into a JWT with a custom timeout.
 pub fn encode_with_timeout(
     response_claims: ResponseClaims,
     enc_key: &Base64,
@@ -38,6 +42,7 @@ pub fn encode_with_timeout(
     )
 }
 
+/// Decodes response claims from a JWT.
 pub fn decode(
     jwt: &str,
     dec_key: &Base64,

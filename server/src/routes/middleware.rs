@@ -31,6 +31,7 @@ use crate::{
 
 use super::errors::ConsoleError;
 
+/// Middleware that validates the authorization header.
 #[instrument(fields(user_id, jwt), skip_all, err(Debug, level = Level::ERROR))]
 pub async fn require_auth(
     State(state): State<Arc<AppState>>,
@@ -70,12 +71,16 @@ pub async fn require_auth(
     Ok(next.run(request).await)
 }
 
+/// Errors related to authentication middleware.
 #[derive(Debug, Error)]
 pub enum AuthError {
+    /// JWK set retrieval error.
     #[error("Could not retrieve JWK set: {0}")]
     Jwk(#[from] reqwest_middleware::Error),
+    /// Invalid JWT.
     #[error("Invalid JWT: {0}")]
     Token(#[from] jsonwebtoken::errors::Error),
+    /// Other error.
     #[error("Other: {0}")]
     Other(#[from] anyhow::Error),
 }
@@ -99,11 +104,13 @@ impl From<reqwest::Error> for AuthError {
     }
 }
 
+/// Extract console ID from path.
 #[derive(Debug, Deserialize)]
 pub struct ConsolePath {
     pub console_id: Uuid,
 }
 
+/// Middleware to validate if user has access to console.
 #[instrument(skip_all, fields(console_id, user_id), err(Debug, level = Level::ERROR))]
 pub async fn validate_console_id(
     State(state): State<Arc<AppState>>,
@@ -122,11 +129,13 @@ pub async fn validate_console_id(
     }
 }
 
+/// Extract site key from path.
 #[derive(Debug, Deserialize)]
 pub struct ApiKeyPath {
     pub site_key: Base64<UrlSafe>,
 }
 
+/// Middleware to validate if api key belongs to console.
 #[instrument(skip_all, fields(site_key, console_id), err(Debug, level = Level::ERROR))]
 pub async fn validate_api_key(
     State(state): State<Arc<AppState>>,
@@ -145,6 +154,7 @@ pub async fn validate_api_key(
     }
 }
 
+/// Middleware to restrict access to admin users.
 #[instrument(skip_all)]
 pub async fn require_admin(
     State(_state): State<Arc<AppState>>,
@@ -164,8 +174,10 @@ pub async fn require_admin(
     }
 }
 
+/// Global bots detector.
 pub static BOTS: LazyLock<Bots> = LazyLock::new(Bots::default);
 
+/// Middleware to block known bots.
 #[instrument(skip_all, fields(user_agent))]
 pub async fn block_bot_agent(
     TypedHeader(user_agent): TypedHeader<UserAgent>,
@@ -182,6 +194,7 @@ pub async fn block_bot_agent(
     }
 }
 
+/// Middleware to validate origin against allowed domains.
 #[instrument(skip_all, fields(%origin), err(Debug, level = Level::ERROR))]
 pub async fn validate_hostname(
     State(state): State<Arc<AppState>>,

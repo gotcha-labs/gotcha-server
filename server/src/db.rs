@@ -14,6 +14,7 @@ pub mod queries;
 pub use errors::*;
 pub use queries::*;
 
+/// Lazily creates a `PgPool` to connect to a database given a config.
 pub fn connect_database(config: DatabaseConfig) -> PgPool {
     let pool_options = PgPoolOptions::default().acquire_timeout(Duration::from_secs(3));
     let conn_options = PgConnectOptions::new()
@@ -30,7 +31,7 @@ pub fn connect_database(config: DatabaseConfig) -> PgPool {
     pool_options.connect_lazy_with(conn_options)
 }
 
-// Extension trait to try to map nested types inside a result type.
+/// Extension trait to try to map nested types inside a result type.
 trait MapNested<T, E> {
     type Output<U>;
 

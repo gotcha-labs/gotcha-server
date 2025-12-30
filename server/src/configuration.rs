@@ -3,12 +3,14 @@ use std::path::PathBuf;
 use secrecy::Secret;
 use serde::Deserialize;
 
+/// Global configuration.
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub application: ApplicationConfig,
     pub database: DatabaseConfig,
 }
 
+/// Application configuration.
 #[derive(Debug, Deserialize)]
 pub struct ApplicationConfig {
     pub host: String,
@@ -18,6 +20,7 @@ pub struct ApplicationConfig {
     pub auth_origin: String,
 }
 
+/// Database configuration.
 #[derive(Debug, Deserialize)]
 pub struct DatabaseConfig {
     pub username: String,
@@ -29,12 +32,14 @@ pub struct DatabaseConfig {
     pub require_ssl: bool,
 }
 
+/// Returns the server directory.
 pub fn server_dir() -> PathBuf {
     std::env::var("SERVER_DIR").map_or(std::env::current_dir().unwrap(), |p| {
         std::env::current_dir().unwrap().join(p)
     })
 }
 
+/// Loads the configuration.
 pub fn get_configuration() -> Result<Config, config::ConfigError> {
     let configuration_directory = server_dir().join("config");
     tracing::debug!("Loading config from: {configuration_directory:?}");
@@ -64,6 +69,7 @@ pub fn get_configuration() -> Result<Config, config::ConfigError> {
     settings.try_deserialize::<Config>()
 }
 
+/// Supported environments.
 pub enum Environment {
     Local,
     Production,

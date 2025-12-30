@@ -2,8 +2,10 @@ use jsonwebtoken::{Algorithm, DecodingKey, Validation};
 
 use super::{AuthClaims, TimeClaims};
 
+/// Algorithm used for authentication tokens.
 pub static JWT_AUTH_ALGORITHM: Algorithm = Algorithm::RS256;
 
+/// Decodes an authentication token.
 pub fn decode(
     jwt: &str,
     dec_key: &DecodingKey,

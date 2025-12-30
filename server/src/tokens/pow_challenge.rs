@@ -6,8 +6,10 @@ use crate::{analysis::proof_of_work::PowChallenge, encodings::Base64};
 
 use super::TimeClaims;
 
+/// Algorithm used for proof of work tokens.
 pub static JWT_POW_ALGORITHM: Algorithm = Algorithm::HS256;
 
+/// Encodes a proof of work challenge into a JWT.
 pub fn encode(
     pow_challenge: PowChallenge,
     enc_key: &Base64,
@@ -19,6 +21,7 @@ pub fn encode(
     )
 }
 
+/// Encodes a proof of work challenge into a JWT with a custom timeout.
 pub fn encode_with_timeout(
     pow_challenge: PowChallenge,
     enc_key_b64: &str,
@@ -31,6 +34,7 @@ pub fn encode_with_timeout(
     )
 }
 
+/// Decodes a proof of work challenge from a JWT.
 pub fn decode(jwt: &str, dec_key_b64: &str) -> Result<PowChallenge, jsonwebtoken::errors::Error> {
     let mut validation = Validation::new(JWT_POW_ALGORITHM);
     TimeClaims::<PowChallenge>::build_validation(&mut validation);

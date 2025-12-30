@@ -164,14 +164,18 @@ pub async fn gen_api_key(
     }))
 }
 
+/// Expected payload for updating the api_key route.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateApiKeyRequest {
+    /// Label. `None` means don't change.
     #[serde(default)]
     pub label: Option<String>,
+    /// Allowed domains. `None` means don't change.
     #[serde(default)]
     pub allowed_domains: Option<Vec<Hostname>>,
 }
 
+/// Updates api key for a given site key that belongs to console.
 #[instrument(skip(state), ret(Debug, level = Level::DEBUG), err(Debug, level = Level::ERROR))]
 pub async fn update_api_key(
     State(state): State<Arc<AppState>>,
@@ -196,11 +200,7 @@ pub async fn update_api_key(
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RevokeKeyRequest {
-    pub site_key: String,
-}
-
+/// Revokes an existing api key for a given site key that belongs to console.
 #[instrument(skip(state), ret(Debug, level = Level::DEBUG), err(Debug, level = Level::ERROR))]
 pub async fn revoke_api_key(
     State(state): State<Arc<AppState>>,
@@ -218,6 +218,7 @@ pub async fn revoke_api_key(
     }
 }
 
+/// Response payload of retrieving challenge preferences.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct ChallengePreferences {
     pub width: u16,
@@ -239,6 +240,7 @@ impl Default for ChallengePreferences {
     }
 }
 
+/// Gets challenge preferences for a console id given in the path.
 #[instrument(skip(state), ret(Debug, level = Level::DEBUG), err(Debug, level = Level::ERROR))]
 pub async fn get_challenge_preferences(
     State(state): State<Arc<AppState>>,
@@ -251,6 +253,7 @@ pub async fn get_challenge_preferences(
     Ok(Json(challenge_preferences))
 }
 
+/// Expected payload for update challenge preferences route.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateChallengePreferences {
     #[serde(default)]
@@ -277,6 +280,7 @@ fn validate_dimension_update(
         })
 }
 
+/// Updates challenge preferences for a console id given in the path.
 #[instrument(skip(state), ret(Debug, level = Level::DEBUG), err(Debug, level = Level::ERROR))]
 pub async fn update_challenge_preferences(
     State(state): State<Arc<AppState>>,
@@ -304,6 +308,7 @@ pub async fn update_challenge_preferences(
     }
 }
 
+/// Response payload of retrieving api key challenge pool.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiKeyChallengePoolResponse {
     pub challenges: Vec<String>,
@@ -323,6 +328,7 @@ pub async fn get_api_key_challenge_pool(
     Ok(Json(ApiKeyChallengePoolResponse { challenges: pool }))
 }
 
+/// Expected payload for add/remove challenge to api key pool routes.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChallengeApiKeyPoolRequest {
     pub challenge_url: String,

@@ -1,21 +1,25 @@
-use std::{borrow::Cow, fmt::Display, str::FromStr};
+use std::{fmt::Display, str::FromStr};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use url::{Host, ParseError};
 
+/// Wraps a `String` for the representation of a hostname and serializes and deserializes to a `String` more efficiently.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Hostname(String);
 
 impl Hostname {
+    /// Checks if the hostname is valid and creates a new one from a `&str`.
     pub fn parse(host_str: &str) -> Result<Self, ParseError> {
         let host = Host::parse(host_str)?;
-        Ok(Hostname::new_unchecked(host.to_string()))
+        Ok(unsafe { Hostname::new_unchecked(host.to_string()) })
     }
 
-    pub fn new_unchecked(host_str: String) -> Self {
+    /// Creates a new hostname without checking if it's valid.
+    pub unsafe fn new_unchecked(host_str: String) -> Self {
         Hostname(host_str)
     }
 
+    /// Exposes the hostname as a `&str`.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -35,7 +39,7 @@ impl<'de> Deserialize<'de> for Hostname {
     where
         D: Deserializer<'de>,
     {
-        let str = Cow::<'de, str>::deserialize(deserializer)?;
+        let str = <&str>::deserialize(deserializer)?;
         Hostname::parse(&str).map_err(serde::de::Error::custom)
     }
 }

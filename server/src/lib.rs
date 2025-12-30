@@ -37,7 +37,9 @@ fn build_client() -> Client {
         .expect("error building HTTP_CLIENT")
 }
 
+/// Global HTTP client.
 pub static HTTP_CLIENT: LazyLock<Client> = LazyLock::new(build_client);
+/// Global HTTP client with caching.
 pub static HTTP_CACHE_CLIENT: LazyLock<ClientWithMiddleware> = LazyLock::new(|| {
     let client = build_client();
     ClientBuilder::new(client)
@@ -49,12 +51,14 @@ pub static HTTP_CACHE_CLIENT: LazyLock<ClientWithMiddleware> = LazyLock::new(|| 
         .build()
 });
 
+/// Shared application state.
 #[derive(Debug)]
 pub struct AppState {
     pub pool: PgPool,
     pub auth_origin: String,
 }
 
+/// Builds the application router.
 pub fn app(config: ApplicationConfig, pool: PgPool) -> Router {
     let state = AppState { pool, auth_origin: config.auth_origin };
 
@@ -89,6 +93,7 @@ fn api(state: AppState) -> Router {
         .layer(CorsLayer::permissive())
 }
 
+/// Initializes tracing.
 pub fn init_tracing() {
     let _ = tracing_subscriber::registry()
         .with(
@@ -99,6 +104,7 @@ pub fn init_tracing() {
         .try_init();
 }
 
+/// Populates database with development data.
 pub async fn db_dev_populate(pool: &PgPool) -> db::Result<()> {
     let _console_id = db::with_console_insert_api_key(
         pool,
