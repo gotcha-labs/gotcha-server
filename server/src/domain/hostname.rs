@@ -40,7 +40,7 @@ impl<'de> Deserialize<'de> for Hostname {
         D: Deserializer<'de>,
     {
         let str = <&str>::deserialize(deserializer)?;
-        Hostname::parse(&str).map_err(serde::de::Error::custom)
+        Hostname::parse(str).map_err(serde::de::Error::custom)
     }
 }
 
