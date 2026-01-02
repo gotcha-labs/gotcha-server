@@ -14,6 +14,7 @@ use crate::{AppState, db, domain::hostname::Hostname, encodings::Base64, tokens:
 
 use super::errors::VerificationError;
 
+/// Verification request payload.
 #[derive(Debug)]
 pub struct VerificationRequest {
     secret: Secret<Base64>,
@@ -21,6 +22,7 @@ pub struct VerificationRequest {
     remoteip: Option<IpAddr>,
 }
 
+/// Verification response payload.
 #[derive(Debug, Serialize, Deserialize, Error)]
 pub struct VerificationResponse {
     pub success: bool,
@@ -32,17 +34,25 @@ pub struct VerificationResponse {
     pub error_codes: Option<Vec<ErrorCodes>>,
 }
 
+/// Error codes for verification response.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ErrorCodes {
+    /// Missing input secret.
     MissingInputSecret,
+    /// Invalid input secret.
     InvalidInputSecret,
+    /// Missing input response.
     MissingInputResponse,
+    /// Invalid input response.
     InvalidInputResponse,
+    /// Bad request.
     BadRequest,
+    /// Timeout or duplicate.
     TimeoutOrDuplicate,
 }
 
+/// Verifies the challenge response.
 #[instrument(skip(state), ret(Debug, level = Level::INFO), err(Debug, level = Level::ERROR))]
 pub async fn site_verify(
     State(state): State<Arc<AppState>>,

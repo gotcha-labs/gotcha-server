@@ -37,6 +37,7 @@ pub mod extractors;
 pub mod middleware;
 pub mod verification;
 
+/// Router for challenge endpoints.
 pub fn challenge(state: &Arc<AppState>) -> Router {
     let state = Arc::clone(state);
     Router::new()
@@ -60,6 +61,7 @@ pub fn challenge(state: &Arc<AppState>) -> Router {
         .with_state(state)
 }
 
+/// Router for verification endpoints.
 pub fn verification(state: &Arc<AppState>) -> Router {
     let state = Arc::clone(state);
     Router::new()
@@ -68,6 +70,7 @@ pub fn verification(state: &Arc<AppState>) -> Router {
         .with_state(state)
 }
 
+/// Router for console endpoints.
 pub fn console(state: &Arc<AppState>) -> Router {
     let state = Arc::clone(state);
 
@@ -117,6 +120,7 @@ pub fn console(state: &Arc<AppState>) -> Router {
         .with_state(state)
 }
 
+/// Router for admin endpoints.
 pub fn admin(state: &Arc<AppState>) -> Router {
     let state = Arc::clone(state);
     Router::new()

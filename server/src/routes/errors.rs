@@ -11,20 +11,28 @@ use crate::db::{self, ConstraintKind};
 
 use super::verification::{ErrorCodes, VerificationResponse};
 
+/// Errors regarding challenge operations.
 #[derive(Debug, Error)]
 pub enum ChallengeError {
+    /// Invalid key.
     #[error("Invalid key")]
     InvalidKey,
+    /// Invalid origin header.
     #[error("Invalid origin header")]
     InvalidOrigin,
+    /// Invalid proof of work challenge.
     #[error("Invalid proof of work challenge")]
     InvalidProofOfWork(#[from] jsonwebtoken::errors::Error),
+    /// Failed proof of work challenge.
     #[error("Failed proof of work challenge")]
     FailedProofOfWork,
+    /// No matching challenge.
     #[error("No matching challenge")]
     NoMatchingChallenge,
+    /// Domain not allowed.
     #[error("Domain not allowed, add this domain to the list of allowed domains")]
     DomainNotAllowed,
+    /// Unexpected error.
     #[error(transparent)]
     Unexpected(#[from] anyhow::Error),
 }
@@ -63,16 +71,22 @@ impl From<db::Error> for ChallengeError {
     }
 }
 
+/// Errors regarding console operations.
 #[derive(Debug, Error)]
 pub enum ConsoleError {
+    /// Not found.
     #[error("Not found: {what}")]
     NotFound { what: String },
+    /// Forbidden.
     #[error("Access forbidden")]
     Forbidden,
+    /// Duplicate resource.
     #[error("Duplicate")]
     Duplicate,
+    /// Invalid input.
     #[error("Invalid input: {what}")]
     InvalidInput { what: String },
+    /// Unexpected error.
     #[error(transparent)]
     Unexpected(#[from] anyhow::Error),
 }
@@ -119,18 +133,25 @@ impl From<db::Error> for ConsoleError {
     }
 }
 
+/// Errors regarding admin operations.
 #[derive(Debug, Error)]
 pub enum AdminError {
+    /// Resource not unique.
     #[error("{what} resource already exists")]
     NotUnique { what: String },
+    /// Invalid dimensions.
     #[error("Dimensions out of range: width and height must be greater than 0")]
     InvalidDimensions,
+    /// Invalid URL.
     #[error("Could not parse URL")]
     InvalidUrl,
+    /// Not found.
     #[error("Challenge not found: url('{0}')")]
     NotFound(String),
+    /// Unauthorized.
     #[error(transparent)]
     Unauthorized(#[from] TypedHeaderRejection),
+    /// Unexpected error.
     #[error(transparent)]
     Unexpected(#[from] anyhow::Error),
 }
@@ -175,12 +196,16 @@ impl From<db::Error> for AdminError {
     }
 }
 
+/// Errors regarding verification operations.
 #[derive(Debug, Error)]
 pub enum VerificationError {
+    /// Verification error.
     #[error(transparent)]
     UserError(#[from] VerificationResponse),
+    /// Bad request.
     #[error(transparent)]
     BadRequest(#[from] FormRejection),
+    /// Unexpected error.
     #[error(transparent)]
     Unexpected(#[from] anyhow::Error),
 }
