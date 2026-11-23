@@ -40,18 +40,27 @@ export default function ChallengeFrame(props: ChallengeFrameProps) {
   const isSmallWindow = createMediaQuery("(max-width: 767px)");
   const isLargeWindow = createMediaQuery("(min-width: 1024px)");
 
-  // Wide screens: render the game at its native size and zoom it uniformly,
-  // so fixed-px games (most of the catalogue) grow instead of floating in
-  // empty space. 160px leaves room for the modal's title, footer and padding.
+  // Wide screens get a 16:10 frame in real pixels, so responsive games render
+  // at full resolution. Games with a fixed layout post
+  // { type: "fixed-size", width, height }: those render at that size and the
+  // iframe is scaled up (their DOM re-rasterizes crisply; a canvas would blur).
+  // 160px leaves room for the modal's title, footer and padding.
   const [viewport, setViewport] = createSignal<[number, number]>([innerWidth, innerHeight]);
   const onResize = () => setViewport([innerWidth, innerHeight] as [number, number]);
   addEventListener("resize", onResize);
   onCleanup(() => removeEventListener("resize", onResize));
-  const nativeW = () => challengeRes.latest?.width ?? 360;
-  const nativeH = () => challengeRes.latest?.height ?? 500;
-  const scale = () => {
+  const [fixedSize, setFixedSize] = createSignal<[number, number] | null>(null);
+  createEffect(() => {
+    challengeRes(); // new challenge: forget the previous game's fixed size
+    setFixedSize(null);
+  });
+  const frame = () => {
     const [vw, vh] = viewport();
-    return Math.max(1, Math.min((vw * 0.9) / nativeW(), (vh * 0.92 - 160) / nativeH()));
+    const fixed = fixedSize();
+    const [w, h] = fixed ?? [16, 10];
+    const fit = Math.min((vw * 0.9) / w, (vh * 0.92 - 160) / h);
+    const scale = fixed ? Math.max(1, fit) : fit;
+    return { w, h, scale, fixed: fixed !== null };
   };
 
   const handleMessage = async (event: MessageEvent) => {
@@ -87,6 +96,11 @@ export default function ChallengeFrame(props: ChallengeFrameProps) {
       case "error-callback":
         props.onError();
         break;
+      case "fixed-size":
+        if (message.width > 0 && message.height > 0) {
+          setFixedSize([message.width, message.height]);
+        }
+        break;
     }
   };
 
@@ -111,8 +125,8 @@ export default function ChallengeFrame(props: ChallengeFrameProps) {
           style={
             isLargeWindow()
               ? {
-                  width: `${nativeW() * scale()}px`,
-                  height: `${nativeH() * scale()}px`,
+                  width: `${frame().w * frame().scale}px`,
+                  height: `${frame().h * frame().scale}px`,
                 }
               : {
                   "--challenge-width": `${(isSmallWindow() ? challengeRes.latest?.smallWidth : challengeRes.latest?.width) ?? 360}px`,
@@ -132,13 +146,17 @@ export default function ChallengeFrame(props: ChallengeFrameProps) {
               <iframe
                 ref={setIframeRef}
                 src={buildChallengeUrl(challengeRes()!, props.params)}
-                class={isLargeWindow() ? "origin-top-left" : "w-full h-full"}
+                class={
+                  isLargeWindow() && frame().fixed
+                    ? "origin-top-left"
+                    : "w-full h-full"
+                }
                 style={
-                  isLargeWindow()
+                  isLargeWindow() && frame().fixed
                     ? {
-                        width: `${nativeW()}px`,
-                        height: `${nativeH()}px`,
-                        transform: `scale(${scale()})`,
+                        width: `${frame().w}px`,
+                        height: `${frame().h}px`,
+                        transform: `scale(${frame().scale})`,
                       }
                     : {}
                 }
