@@ -101,12 +101,6 @@ class GotchaServerStack extends cdk.Stack {
       autoDeleteObjects: true,
     });
 
-    // Deploy widget files to S3
-    new s3deploy.BucketDeployment(this, "DeployStaticFiles", {
-      sources: [s3deploy.Source.asset("../../dist")],
-      destinationBucket: staticFilesBucket,
-    });
-
     // CloudFront distribution for widget files
     const distribution = new cloudfront.Distribution(
       this,
@@ -125,6 +119,15 @@ class GotchaServerStack extends cdk.Stack {
         comment: `Gotcha Widget CDN - ${stageName}`,
       },
     );
+
+    // Deploy widget files to S3 and invalidate the CDN so a new api.js is
+    // served immediately instead of after the cache TTL (up to 24h).
+    new s3deploy.BucketDeployment(this, "DeployStaticFiles", {
+      sources: [s3deploy.Source.asset("../../dist")],
+      destinationBucket: staticFilesBucket,
+      distribution,
+      distributionPaths: ["/*"],
+    });
 
     new cdk.CfnOutput(this, "ApiUrl", {
       value: `https://${api.ref}.execute-api.${this.region}.amazonaws.com/`,

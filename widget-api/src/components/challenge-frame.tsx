@@ -5,6 +5,7 @@ import {
   createResource,
   createSignal,
   Match,
+  onCleanup,
   Switch,
 } from "solid-js";
 import { defaultRenderParams } from "../gotcha-captcha";
@@ -37,6 +38,21 @@ export default function ChallengeFrame(props: ChallengeFrameProps) {
   );
 
   const isSmallWindow = createMediaQuery("(max-width: 767px)");
+  const isLargeWindow = createMediaQuery("(min-width: 1024px)");
+
+  // Wide screens: render the game at its native size and zoom it uniformly,
+  // so fixed-px games (most of the catalogue) grow instead of floating in
+  // empty space. 160px leaves room for the modal's title, footer and padding.
+  const [viewport, setViewport] = createSignal<[number, number]>([innerWidth, innerHeight]);
+  const onResize = () => setViewport([innerWidth, innerHeight] as [number, number]);
+  addEventListener("resize", onResize);
+  onCleanup(() => removeEventListener("resize", onResize));
+  const nativeW = () => challengeRes.latest?.width ?? 360;
+  const nativeH = () => challengeRes.latest?.height ?? 500;
+  const scale = () => {
+    const [vw, vh] = viewport();
+    return Math.max(1, Math.min((vw * 0.9) / nativeW(), (vh * 0.92 - 160) / nativeH()));
+  };
 
   const handleMessage = async (event: MessageEvent) => {
     const challenge = challengeRes();
@@ -92,11 +108,22 @@ export default function ChallengeFrame(props: ChallengeFrameProps) {
         </h1>
 
         <div
-          style={{
-            "--challenge-width": `${(isSmallWindow() ? challengeRes.latest?.smallWidth : challengeRes.latest?.width) ?? 360}px`,
-            "--challenge-height": `${(isSmallWindow() ? challengeRes.latest?.smallHeight : challengeRes.latest?.height) ?? 500}px`,
-          }}
-          class="mx-auto w-[80vw] h-[80vh] max-w-[var(--challenge-width)] max-h-[var(--challenge-height)]"
+          style={
+            isLargeWindow()
+              ? {
+                  width: `${nativeW() * scale()}px`,
+                  height: `${nativeH() * scale()}px`,
+                }
+              : {
+                  "--challenge-width": `${(isSmallWindow() ? challengeRes.latest?.smallWidth : challengeRes.latest?.width) ?? 360}px`,
+                  "--challenge-height": `${(isSmallWindow() ? challengeRes.latest?.smallHeight : challengeRes.latest?.height) ?? 500}px`,
+                }
+          }
+          class={
+            isLargeWindow()
+              ? "mx-auto"
+              : "mx-auto w-[80vw] h-[80vh] max-w-[var(--challenge-width)] max-h-[var(--challenge-height)]"
+          }
         >
           <Switch>
             <Match when={challengeRes.loading}>Loading...</Match>
@@ -105,7 +132,16 @@ export default function ChallengeFrame(props: ChallengeFrameProps) {
               <iframe
                 ref={setIframeRef}
                 src={buildChallengeUrl(challengeRes()!, props.params)}
-                class="w-full h-full"
+                class={isLargeWindow() ? "origin-top-left" : "w-full h-full"}
+                style={
+                  isLargeWindow()
+                    ? {
+                        width: `${nativeW()}px`,
+                        height: `${nativeH()}px`,
+                        transform: `scale(${scale()})`,
+                      }
+                    : {}
+                }
                 sandbox="allow-forms allow-scripts allow-same-origin"
               />
             </Match>
